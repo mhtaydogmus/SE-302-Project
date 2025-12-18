@@ -1,13 +1,18 @@
 package edu.ieu.se302.examscheduler.ui.util;
 
 import com.examscheduler.entity.Course;
+import com.examscheduler.entity.Exam;
 import com.examscheduler.entity.Room;
 import com.examscheduler.entity.Student;
+import com.examscheduler.entity.TimeSlot;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.time.LocalDate;
+import java.time.LocalTime;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -127,6 +132,86 @@ public final class CsvImportService {
         return rooms;
     }
 
+    public static List<TimeSlot> importTimeSlots(Path path) throws IOException {
+        List<List<String>> rows = readCsv(path);
+        Map<String, Integer> headers = mapHeaders(rows, path);
+
+        requireHeader(headers, "date", path);
+        requireHeader(headers, "starttime", path);
+        requireHeader(headers, "endtime", path);
+
+        List<TimeSlot> timeSlots = new ArrayList<>();
+        Set<String> seenKeys = new HashSet<>();
+
+        for (int i = 1; i < rows.size(); i++) {
+            List<String> row = rows.get(i);
+            if (row.isEmpty() || isBlankRow(row)) {
+                continue;
+            }
+
+            LocalDate date = parseDate(getField(headers, row, "date"), i + 1, path);
+            LocalTime start = parseTime(getField(headers, row, "starttime"), "start time", i + 1, path);
+            LocalTime end = parseTime(getField(headers, row, "endtime"), "end time", i + 1, path);
+
+            String key = date + "|" + start + "|" + end;
+            if (!seenKeys.add(key)) {
+                throw new IllegalArgumentException("Duplicate time slot at line " + (i + 1) + " in " + path.getFileName());
+            }
+
+            timeSlots.add(new TimeSlot(date, start, end));
+        }
+
+        return timeSlots;
+    }
+
+    public static List<Exam> importExams(Path path, List<Course> courses) throws IOException {
+        List<List<String>> rows = readCsv(path);
+        Map<String, Integer> headers = mapHeaders(rows, path);
+
+        requireHeader(headers, "examid", path);
+        requireHeader(headers, "courseid", path);
+        requireHeader(headers, "examtype", path);
+        requireHeader(headers, "durationminutes", path);
+
+        Map<String, Course> courseMap = new HashMap<>();
+        if (courses != null) {
+            for (Course course : courses) {
+                courseMap.put(course.getCourseId(), course);
+            }
+        }
+
+        List<Exam> exams = new ArrayList<>();
+        Set<String> seenIds = new HashSet<>();
+
+        for (int i = 1; i < rows.size(); i++) {
+            List<String> row = rows.get(i);
+            if (row.isEmpty() || isBlankRow(row)) {
+                continue;
+            }
+
+            String examId = getField(headers, row, "examid");
+            String courseId = getField(headers, row, "courseid");
+            String examType = getField(headers, row, "examtype");
+            int durationMinutes = parseInt(getField(headers, row, "durationminutes"), "duration minutes", i + 1, path);
+
+            if (examId.isBlank()) {
+                throw new IllegalArgumentException("Missing Exam ID at line " + (i + 1) + " in " + path.getFileName());
+            }
+            if (!seenIds.add(examId)) {
+                throw new IllegalArgumentException("Duplicate Exam ID '" + examId + "' at line " + (i + 1) + " in " + path.getFileName());
+            }
+
+            Course course = courseMap.get(courseId);
+            if (course == null) {
+                throw new IllegalArgumentException("Unknown Course ID '" + courseId + "' at line " + (i + 1) + " in " + path.getFileName());
+            }
+
+            exams.add(new Exam(examId, course, examType, durationMinutes));
+        }
+
+        return exams;
+    }
+
     private static List<List<String>> readCsv(Path path) throws IOException {
         List<String> lines = Files.readAllLines(path, StandardCharsets.UTF_8);
         if (lines.isEmpty()) {
@@ -174,6 +259,22 @@ public final class CsvImportService {
         try {
             return Integer.parseInt(value.trim());
         } catch (NumberFormatException ex) {
+            throw new IllegalArgumentException("Invalid " + label + " at line " + lineNumber + " in " + path.getFileName());
+        }
+    }
+
+    private static LocalDate parseDate(String value, int lineNumber, Path path) {
+        try {
+            return LocalDate.parse(value.trim());
+        } catch (DateTimeParseException ex) {
+            throw new IllegalArgumentException("Invalid date at line " + lineNumber + " in " + path.getFileName());
+        }
+    }
+
+    private static LocalTime parseTime(String value, String label, int lineNumber, Path path) {
+        try {
+            return LocalTime.parse(value.trim());
+        } catch (DateTimeParseException ex) {
             throw new IllegalArgumentException("Invalid " + label + " at line " + lineNumber + " in " + path.getFileName());
         }
     }

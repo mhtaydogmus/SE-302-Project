@@ -1,12 +1,16 @@
 package edu.ieu.se302.examscheduler.ui;
 
 import edu.ieu.se302.examscheduler.ui.views.CourseManagementView;
+import edu.ieu.se302.examscheduler.ui.views.EnrollmentManagementView;
+import edu.ieu.se302.examscheduler.ui.views.ExamManagementView;
 import edu.ieu.se302.examscheduler.ui.views.RoomManagementView;
 import edu.ieu.se302.examscheduler.ui.views.ScheduleGenerationView;
 import edu.ieu.se302.examscheduler.ui.views.StudentManagementView;
 import edu.ieu.se302.examscheduler.ui.views.TimeSlotManagementView;
 import edu.ieu.se302.examscheduler.ui.util.CsvImportService;
 import edu.ieu.se302.examscheduler.ui.util.I18n;
+import com.examscheduler.entity.Enrollment;
+import com.examscheduler.entity.Exam;
 import com.examscheduler.entity.ExamSession;
 import javafx.beans.binding.Bindings;
 import javafx.collections.FXCollections;
@@ -31,16 +35,22 @@ public class MainWindow {
 
     private final BorderPane root = new BorderPane();
     private final StackPane contentPane = new StackPane();
+    private final ObservableList<Enrollment> enrollments = FXCollections.observableArrayList();
+    private final ObservableList<Exam> exams = FXCollections.observableArrayList();
     private final ObservableList<ExamSession> scheduleSessions = FXCollections.observableArrayList();
     private Path lastStudentsPath;
     private Path lastCoursesPath;
     private Path lastRoomsPath;
+    private Path lastTimeSlotsPath;
+    private Path lastExamsPath;
     private MenuItem reimportItem;
 
-    private final StudentManagementView studentView = new StudentManagementView();
-    private final CourseManagementView courseView = new CourseManagementView(scheduleSessions);
+    private final StudentManagementView studentView = new StudentManagementView(enrollments);
+    private final CourseManagementView courseView = new CourseManagementView(scheduleSessions, enrollments);
     private final RoomManagementView roomView = new RoomManagementView(scheduleSessions);
     private final TimeSlotManagementView timeSlotView = new TimeSlotManagementView();
+    private final ExamManagementView examView = new ExamManagementView(exams, courseView.getCourses());
+    private final EnrollmentManagementView enrollmentView = new EnrollmentManagementView(enrollments, studentView.getStudents(), courseView.getCourses());
     private final ScheduleGenerationView scheduleView;
 
     public MainWindow() {
@@ -49,6 +59,7 @@ public class MainWindow {
                 courseView.getCourses(),
                 roomView.getRooms(),
                 timeSlotView.getTimeSlots(),
+                exams,
                 scheduleSessions
         );
         root.setTop(buildMenuBar());
@@ -86,7 +97,11 @@ public class MainWindow {
         rooms.setOnAction(e -> show(roomView.getView()));
         MenuItem timeSlots = new MenuItem(I18n.get("menu.data.timeslots"));
         timeSlots.setOnAction(e -> show(timeSlotView.getView()));
-        data.getItems().addAll(students, courses, rooms, timeSlots);
+        MenuItem examsItem = new MenuItem(I18n.get("menu.data.exams"));
+        examsItem.setOnAction(e -> show(examView.getView()));
+        MenuItem enrollmentsItem = new MenuItem(I18n.get("menu.data.enrollments"));
+        enrollmentsItem.setOnAction(e -> show(enrollmentView.getView()));
+        data.getItems().addAll(students, courses, rooms, timeSlots, examsItem, enrollmentsItem);
 
         Menu schedule = new Menu(I18n.get("menu.schedule"));
         MenuItem generate = new MenuItem(I18n.get("menu.schedule.generate"));
@@ -126,8 +141,20 @@ public class MainWindow {
             return;
         }
 
+        fileChooser.setTitle("Select Time Slots CSV");
+        File timeSlotsFile = fileChooser.showOpenDialog(root.getScene().getWindow());
+        if (timeSlotsFile == null) {
+            return;
+        }
+
+        fileChooser.setTitle("Select Exams CSV");
+        File examsFile = fileChooser.showOpenDialog(root.getScene().getWindow());
+        if (examsFile == null) {
+            return;
+        }
+
         try {
-            importFromPaths(studentsFile.toPath(), coursesFile.toPath(), roomsFile.toPath());
+            importFromPaths(studentsFile.toPath(), coursesFile.toPath(), roomsFile.toPath(), timeSlotsFile.toPath(), examsFile.toPath());
         } catch (IllegalArgumentException ex) {
             showError(I18n.get("dialog.error.import.title"), ex.getMessage());
         } catch (Exception ex) {
@@ -136,12 +163,13 @@ public class MainWindow {
     }
 
     private void reimportLastFiles() {
-        if (lastStudentsPath == null || lastCoursesPath == null || lastRoomsPath == null) {
+        if (lastStudentsPath == null || lastCoursesPath == null || lastRoomsPath == null ||
+            lastTimeSlotsPath == null || lastExamsPath == null) {
             showError(I18n.get("dialog.error.reimport.title"), I18n.get("dialog.error.reimport.missing"));
             return;
         }
         try {
-            importFromPaths(lastStudentsPath, lastCoursesPath, lastRoomsPath);
+            importFromPaths(lastStudentsPath, lastCoursesPath, lastRoomsPath, lastTimeSlotsPath, lastExamsPath);
         } catch (IllegalArgumentException ex) {
             showError(I18n.get("dialog.error.import.title"), ex.getMessage());
         } catch (Exception ex) {
@@ -149,18 +177,25 @@ public class MainWindow {
         }
     }
 
-    private void importFromPaths(Path studentsPath, Path coursesPath, Path roomsPath) throws Exception {
+    private void importFromPaths(Path studentsPath, Path coursesPath, Path roomsPath, Path timeSlotsPath, Path examsPath) throws Exception {
         List<com.examscheduler.entity.Student> importedStudents = CsvImportService.importStudents(studentsPath);
         List<com.examscheduler.entity.Course> importedCourses = CsvImportService.importCourses(coursesPath);
         List<com.examscheduler.entity.Room> importedRooms = CsvImportService.importRooms(roomsPath);
+        List<com.examscheduler.entity.TimeSlot> importedTimeSlots = CsvImportService.importTimeSlots(timeSlotsPath);
+        List<com.examscheduler.entity.Exam> importedExams = CsvImportService.importExams(examsPath, importedCourses);
 
         studentView.getStudents().setAll(importedStudents);
         courseView.getCourses().setAll(importedCourses);
         roomView.getRooms().setAll(importedRooms);
+        timeSlotView.getTimeSlots().setAll(importedTimeSlots);
+        exams.setAll(importedExams);
+        enrollments.clear();
 
         lastStudentsPath = studentsPath;
         lastCoursesPath = coursesPath;
         lastRoomsPath = roomsPath;
+        lastTimeSlotsPath = timeSlotsPath;
+        lastExamsPath = examsPath;
         reimportItem.setDisable(false);
     }
 

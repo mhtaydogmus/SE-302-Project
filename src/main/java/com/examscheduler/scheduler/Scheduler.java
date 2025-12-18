@@ -3,6 +3,7 @@ package com.examscheduler.scheduler;
 import com.examscheduler.constraint.MaxExamsPerDayConstraint;
 import com.examscheduler.constraint.NoConsecutiveExamsConstraint;
 import com.examscheduler.constraint.NoOverlapConstraint;
+import com.examscheduler.constraint.RoomCapacityConstraint;
 import com.examscheduler.constraint.Constraint;
 import com.examscheduler.entity.*;
 
@@ -49,6 +50,7 @@ public class Scheduler {
         schedule.addConstraint(new NoOverlapConstraint());
         schedule.addConstraint(new MaxExamsPerDayConstraint(maxExamsPerDay));
         schedule.addConstraint(new NoConsecutiveExamsConstraint());
+        schedule.addConstraint(new RoomCapacityConstraint());
         for (Constraint constraint : customConstraints) {
             schedule.addConstraint(constraint);
         }

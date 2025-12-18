@@ -24,7 +24,6 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 
 public class ScheduleGenerationView {
 
@@ -33,12 +32,14 @@ public class ScheduleGenerationView {
     private final ObservableList<Course> courses;
     private final ObservableList<Room> rooms;
     private final ObservableList<TimeSlot> timeSlots;
+    private final ObservableList<Exam> exams;
     private final ObservableList<ExamSession> scheduleSessions;
     private final FilteredList<ExamSession> filteredScheduleSessions;
     private final TableView<ExamSession> scheduleTable = new TableView<>();
     private final ListView<Student> studentList;
     private final DatePicker scheduleDatePicker = new DatePicker();
     private final Button clearDateFilterButton = new Button("Show All Dates");
+    private final Spinner<Integer> maxExamsPerDaySpinner = new Spinner<>(1, 10, 2);
 
     // Student Details Panel
     private VBox detailsPanel;
@@ -53,11 +54,12 @@ public class ScheduleGenerationView {
     private ScheduleController scheduleController;
 
 
-    public ScheduleGenerationView(ObservableList<Student> students, ObservableList<Course> courses, ObservableList<Room> rooms, ObservableList<TimeSlot> timeSlots, ObservableList<ExamSession> scheduleSessions) {
+    public ScheduleGenerationView(ObservableList<Student> students, ObservableList<Course> courses, ObservableList<Room> rooms, ObservableList<TimeSlot> timeSlots, ObservableList<Exam> exams, ObservableList<ExamSession> scheduleSessions) {
         this.students = students;
         this.courses = courses;
         this.rooms = rooms;
         this.timeSlots = timeSlots;
+        this.exams = exams;
         this.scheduleSessions = scheduleSessions;
         this.filteredScheduleSessions = new FilteredList<>(scheduleSessions, session -> true);
         this.studentList = new ListView<>(students);
@@ -81,8 +83,11 @@ public class ScheduleGenerationView {
             }
         });
 
+        maxExamsPerDaySpinner.setEditable(true);
+        maxExamsPerDaySpinner.setId("maxExamsPerDaySpinner");
         HBox buttons = new HBox(8, generateBtn, generatePrintBtn);
         HBox dateFilterRow = new HBox(8, new Label("Filter Date:"), scheduleDatePicker, clearDateFilterButton);
+        HBox maxExamsRow = new HBox(8, new Label("Max Exams/Day:"), maxExamsPerDaySpinner);
         scheduleDatePicker.setId("scheduleDatePicker");
         clearDateFilterButton.setId("scheduleDateClearButton");
         scheduleDatePicker.valueProperty().addListener((obs, oldDate, newDate) -> applyDateFilter(newDate));
@@ -92,7 +97,7 @@ public class ScheduleGenerationView {
         studentList.setPrefHeight(200);
         VBox.setVgrow(studentList, Priority.ALWAYS);
 
-        VBox controls = new VBox(10, title, buttons, dateFilterRow, studentsLabel, studentList);
+        VBox controls = new VBox(10, title, buttons, maxExamsRow, dateFilterRow, studentsLabel, studentList);
         controls.setPadding(new Insets(0, 10, 0, 0));
 
         root.setLeft(controls);
@@ -246,38 +251,34 @@ public class ScheduleGenerationView {
     }
 
     private Schedule generateSchedule() {
-        if (students.isEmpty() || courses.isEmpty() || rooms.isEmpty() || timeSlots.isEmpty()) {
+        if (students.isEmpty() || courses.isEmpty() || rooms.isEmpty() || timeSlots.isEmpty() || exams.isEmpty()) {
             Alert alert = new Alert(Alert.AlertType.WARNING);
             alert.setTitle("Cannot Generate Schedule");
             alert.setHeaderText(null);
-            alert.setContentText("Please add students, courses, rooms, and time slots before generating a schedule.");
+            alert.setContentText("Please add students, courses, rooms, time slots, and exams before generating a schedule.");
             alert.showAndWait();
             return null;
         }
 
-        // 1. Create dummy enrollments
-        for (Student student : students) {
-            for (Course course : courses) {
-                Enrollment enrollment = new Enrollment(UUID.randomUUID().toString(), student, course);
-                student.addEnrollment(enrollment);
-                course.addEnrollment(enrollment);
-            }
+        boolean hasEnrollments = courses.stream().anyMatch(course -> !course.getEnrollments().isEmpty());
+        if (!hasEnrollments) {
+            Alert alert = new Alert(Alert.AlertType.WARNING);
+            alert.setTitle("Cannot Generate Schedule");
+            alert.setHeaderText(null);
+            alert.setContentText("Please enroll students in courses before generating a schedule.");
+            alert.showAndWait();
+            return null;
         }
 
-        // 2. Create exams for each course
-        List<Exam> exams = new ArrayList<>();
-        for (Course course : courses) {
-            exams.add(new Exam(UUID.randomUUID().toString(), course, "Final", 120));
-        }
+        // 1. Configure and run the scheduler
+        int maxExamsPerDay = maxExamsPerDaySpinner.getValue();
+        Scheduler scheduler = new Scheduler(new ArrayList<>(rooms), new ArrayList<>(timeSlots), maxExamsPerDay);
+        Schedule schedule = scheduler.generateSchedule(new ArrayList<>(courses), new ArrayList<>(exams));
 
-        // 3. Configure and run the scheduler
-        Scheduler scheduler = new Scheduler(new ArrayList<>(rooms), new ArrayList<>(timeSlots), 2);
-        Schedule schedule = scheduler.generateSchedule(new ArrayList<>(courses), exams);
-
-        // 4. Display the results
+        // 2. Display the results
         scheduleSessions.setAll(schedule.getExamSessions());
 
-        // 5. Show violations in an alert
+        // 3. Show violations in an alert
         List<String> violations = schedule.validate();
         if (!violations.isEmpty()) {
             scheduleSessions.clear();

@@ -1,6 +1,7 @@
 package edu.ieu.se302.examscheduler.ui.views;
 
 import com.examscheduler.entity.Course;
+import com.examscheduler.entity.Enrollment;
 import com.examscheduler.entity.ExamSession;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.SimpleStringProperty;
@@ -27,11 +28,13 @@ public class CourseManagementView {
     private final ObservableList<Course> courses = FXCollections.observableArrayList();
     private final ListView<Course> courseList = new ListView<>(courses);
     private final ObservableList<ExamSession> scheduleSessions;
+    private final ObservableList<Enrollment> enrollments;
     private final TableView<ExamSession> courseScheduleTable = new TableView<>();
     private Label courseScheduleTitle;
 
-    public CourseManagementView(ObservableList<ExamSession> scheduleSessions) {
+    public CourseManagementView(ObservableList<ExamSession> scheduleSessions, ObservableList<Enrollment> enrollments) {
         this.scheduleSessions = scheduleSessions;
+        this.enrollments = enrollments;
         // Sample Data
         courses.add(new Course("CS101", "Intro to Programming", "CS101", 6));
         courses.add(new Course("MATH201", "Calculus II", "MATH201", 4));
@@ -88,6 +91,7 @@ public class CourseManagementView {
                 Optional<ButtonType> result = alert.showAndWait();
                 if (result.isPresent() && result.get() == ButtonType.OK) {
                     courses.remove(selectedCourse);
+                    removeEnrollmentsForCourse(selectedCourse);
                 }
             } else {
                 info("No course selected.");
@@ -147,6 +151,24 @@ public class CourseManagementView {
                                 .collect(Collectors.toList())
                 )
         );
+    }
+
+    private void removeEnrollmentsForCourse(Course course) {
+        if (enrollments == null || course == null) {
+            return;
+        }
+        enrollments.removeIf(enrollment -> {
+            if (!course.equals(enrollment.getCourse())) {
+                return false;
+            }
+            if (enrollment.getStudent() != null) {
+                enrollment.getStudent().removeEnrollment(enrollment);
+            }
+            if (enrollment.getCourse() != null) {
+                enrollment.getCourse().removeEnrollment(enrollment);
+            }
+            return true;
+        });
     }
 
     private void showCourseDialog(Course course) {

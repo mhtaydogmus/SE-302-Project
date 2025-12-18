@@ -1,6 +1,7 @@
 package edu.ieu.se302.examscheduler.ui.views;
 
 import com.examscheduler.entity.Course;
+import com.examscheduler.entity.Enrollment;
 import com.examscheduler.entity.ExamSession;
 import com.examscheduler.entity.Student;
 import javafx.beans.property.SimpleObjectProperty;
@@ -26,6 +27,7 @@ public class StudentManagementView {
 
     private final BorderPane root = new BorderPane();
     private final ObservableList<Student> students = FXCollections.observableArrayList();
+    private final ObservableList<Enrollment> enrollments;
     private final ListView<Student> studentList = new ListView<>(students);
     private VBox detailsPanel;
     private Label studentNameLabel;
@@ -35,7 +37,8 @@ public class StudentManagementView {
     private TableView<ExamSession> upcomingExamsTable;
 
 
-    public StudentManagementView() {
+    public StudentManagementView(ObservableList<Enrollment> enrollments) {
+        this.enrollments = enrollments;
         // Sample Data
         students.add(new Student("101", "Ali", "Veli", "ali@mail.com", "Male"));
         students.add(new Student("102", "Ayşe", "Fatma", "ayse@mail.com", "Female"));
@@ -88,6 +91,7 @@ public class StudentManagementView {
                 Optional<ButtonType> result = alert.showAndWait();
                 if (result.isPresent() && result.get() == ButtonType.OK) {
                     students.remove(selectedStudent);
+                    removeEnrollmentsForStudent(selectedStudent);
                 }
             } else {
                 info("No student selected.");
@@ -160,6 +164,7 @@ public class StudentManagementView {
                 Optional<ButtonType> result = alert.showAndWait();
                 if (result.isPresent() && result.get() == ButtonType.OK) {
                     students.remove(selectedStudent);
+                    removeEnrollmentsForStudent(selectedStudent);
                 }
             } else {
                 info("No student selected.");
@@ -223,6 +228,24 @@ public class StudentManagementView {
         upcomingExamsTable.getColumns().addAll(dateCol, timeCol, roomCol, courseCol);
         upcomingExamsTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
         upcomingExamsTable.setPlaceholder(new Label("Select a student to view their exam schedule."));
+    }
+
+    private void removeEnrollmentsForStudent(Student student) {
+        if (enrollments == null || student == null) {
+            return;
+        }
+        enrollments.removeIf(enrollment -> {
+            if (!student.equals(enrollment.getStudent())) {
+                return false;
+            }
+            if (enrollment.getStudent() != null) {
+                enrollment.getStudent().removeEnrollment(enrollment);
+            }
+            if (enrollment.getCourse() != null) {
+                enrollment.getCourse().removeEnrollment(enrollment);
+            }
+            return true;
+        });
     }
 
 
