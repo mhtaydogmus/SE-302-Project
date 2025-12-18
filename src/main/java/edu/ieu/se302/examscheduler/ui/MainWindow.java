@@ -1,8 +1,10 @@
 package edu.ieu.se302.examscheduler.ui;
 
 import edu.ieu.se302.examscheduler.ui.views.CourseManagementView;
+import edu.ieu.se302.examscheduler.ui.views.RoomManagementView;
 import edu.ieu.se302.examscheduler.ui.views.ScheduleGenerationView;
 import edu.ieu.se302.examscheduler.ui.views.StudentManagementView;
+import edu.ieu.se302.examscheduler.ui.views.TimeSlotManagementView;
 import javafx.geometry.Insets;
 import javafx.scene.Parent;
 import javafx.scene.control.*;
@@ -20,9 +22,17 @@ public class MainWindow {
 
     private final StudentManagementView studentView = new StudentManagementView();
     private final CourseManagementView courseView = new CourseManagementView();
-    private final ScheduleGenerationView scheduleView = new ScheduleGenerationView();
+    private final RoomManagementView roomView = new RoomManagementView();
+    private final TimeSlotManagementView timeSlotView = new TimeSlotManagementView();
+    private final ScheduleGenerationView scheduleView;
 
     public MainWindow() {
+        scheduleView = new ScheduleGenerationView(
+                studentView.getStudents(),
+                courseView.getCourses(),
+                roomView.getRooms(),
+                timeSlotView.getTimeSlots()
+        );
         root.setTop(buildMenuBar());
         root.setCenter(contentPane);
         BorderPane.setMargin(contentPane, new Insets(10));
@@ -48,7 +58,11 @@ public class MainWindow {
         students.setOnAction(e -> show(studentView.getView()));
         MenuItem courses = new MenuItem("Course Management");
         courses.setOnAction(e -> show(courseView.getView()));
-        data.getItems().addAll(students, courses);
+        MenuItem rooms = new MenuItem("Room Management");
+        rooms.setOnAction(e -> show(roomView.getView()));
+        MenuItem timeSlots = new MenuItem("Time Slot Management");
+        timeSlots.setOnAction(e -> show(timeSlotView.getView()));
+        data.getItems().addAll(students, courses, rooms, timeSlots);
 
         Menu schedule = new Menu("Schedule");
         MenuItem generate = new MenuItem("Schedule Generation");
