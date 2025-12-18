@@ -1,7 +1,9 @@
 package com.examscheduler.scheduler;
 
 import com.examscheduler.constraint.MaxExamsPerDayConstraint;
+import com.examscheduler.constraint.NoConsecutiveExamsConstraint;
 import com.examscheduler.constraint.NoOverlapConstraint;
+import com.examscheduler.constraint.Constraint;
 import com.examscheduler.entity.*;
 
 import java.time.LocalDate;
@@ -13,17 +15,27 @@ public class Scheduler {
     private List<Room> availableRooms;
     private List<TimeSlot> availableTimeSlots;
     private int maxExamsPerDay;
+    private List<Constraint> customConstraints;
 
     public Scheduler() {
         this.availableRooms = new ArrayList<>();
         this.availableTimeSlots = new ArrayList<>();
         this.maxExamsPerDay = 2;
+        this.customConstraints = new ArrayList<>();
     }
 
     public Scheduler(List<Room> availableRooms, List<TimeSlot> availableTimeSlots, int maxExamsPerDay) {
         this.availableRooms = availableRooms != null ? new ArrayList<>(availableRooms) : new ArrayList<>();
         this.availableTimeSlots = availableTimeSlots != null ? new ArrayList<>(availableTimeSlots) : new ArrayList<>();
         this.maxExamsPerDay = maxExamsPerDay;
+        this.customConstraints = new ArrayList<>();
+    }
+
+    public Scheduler(List<Room> availableRooms, List<TimeSlot> availableTimeSlots, int maxExamsPerDay, List<Constraint> customConstraints) {
+        this.availableRooms = availableRooms != null ? new ArrayList<>(availableRooms) : new ArrayList<>();
+        this.availableTimeSlots = availableTimeSlots != null ? new ArrayList<>(availableTimeSlots) : new ArrayList<>();
+        this.maxExamsPerDay = maxExamsPerDay;
+        this.customConstraints = customConstraints != null ? new ArrayList<>(customConstraints) : new ArrayList<>();
     }
 
     public Schedule generateSchedule(List<Course> courses, List<Exam> exams) {
@@ -36,6 +48,10 @@ public class Scheduler {
 
         schedule.addConstraint(new NoOverlapConstraint());
         schedule.addConstraint(new MaxExamsPerDayConstraint(maxExamsPerDay));
+        schedule.addConstraint(new NoConsecutiveExamsConstraint());
+        for (Constraint constraint : customConstraints) {
+            schedule.addConstraint(constraint);
+        }
 
         for (Exam exam : exams) {
             List<Student> enrolledStudents = exam.getEnrolledStudents();
@@ -82,7 +98,9 @@ public class Scheduler {
 
             List<Student> studentsToAssign = new ArrayList<>();
             for (Student student : new ArrayList<>(remainingStudents)) {
-                if (!student.hasExamOverlap(session)) {
+                if (!student.hasExamOverlap(session) &&
+                    student.getDailyExamCount(session.getTimeSlot().getDate()) < maxExamsPerDay &&
+                    !hasConsecutiveExam(student, session)) {
                     studentsToAssign.add(student);
                     if (studentsToAssign.size() >= selectedRoom.getCapacity()) {
                         break;
@@ -106,6 +124,27 @@ public class Scheduler {
         }
 
         return sessions;
+    }
+
+    private boolean hasConsecutiveExam(Student student, ExamSession newSession) {
+        if (student == null || newSession == null || newSession.getTimeSlot() == null) {
+            return false;
+        }
+
+        for (ExamSession existingSession : student.getAssignedSessions()) {
+            if (existingSession.getTimeSlot() == null) {
+                continue;
+            }
+            if (!newSession.getTimeSlot().getDate().equals(existingSession.getTimeSlot().getDate())) {
+                continue;
+            }
+            if (newSession.getTimeSlot().getStartTime().equals(existingSession.getTimeSlot().getEndTime()) ||
+                newSession.getTimeSlot().getEndTime().equals(existingSession.getTimeSlot().getStartTime())) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private TimeSlot selectTimeSlot(List<Student> students, Schedule schedule) {
@@ -199,5 +238,19 @@ public class Scheduler {
 
     public void setMaxExamsPerDay(int maxExamsPerDay) {
         this.maxExamsPerDay = maxExamsPerDay;
+    }
+
+    public void addConstraint(Constraint constraint) {
+        if (constraint != null && !customConstraints.contains(constraint)) {
+            customConstraints.add(constraint);
+        }
+    }
+
+    public List<Constraint> getCustomConstraints() {
+        return new ArrayList<>(customConstraints);
+    }
+
+    public void setCustomConstraints(List<Constraint> customConstraints) {
+        this.customConstraints = customConstraints != null ? new ArrayList<>(customConstraints) : new ArrayList<>();
     }
 }

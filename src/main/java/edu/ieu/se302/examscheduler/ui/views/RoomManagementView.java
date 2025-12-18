@@ -1,8 +1,12 @@
 package edu.ieu.se302.examscheduler.ui.views;
 
+import com.examscheduler.entity.ExamSession;
 import com.examscheduler.entity.Room;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.collections.ListChangeListener;
 import javafx.geometry.Insets;
 import javafx.scene.Parent;
 import javafx.scene.control.*;
@@ -12,15 +16,22 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.util.Callback;
 
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 public class RoomManagementView {
 
     private final BorderPane root = new BorderPane();
     private final ObservableList<Room> rooms = FXCollections.observableArrayList();
     private final ListView<Room> roomList = new ListView<>(rooms);
+    private final ObservableList<ExamSession> scheduleSessions;
+    private final TableView<ExamSession> roomScheduleTable = new TableView<>();
+    private Label roomScheduleTitle;
 
-    public RoomManagementView() {
+    public RoomManagementView(ObservableList<ExamSession> scheduleSessions) {
+        this.scheduleSessions = scheduleSessions;
         // Sample Data
         rooms.add(new Room("R101", "Room 101", 30));
         rooms.add(new Room("R102", "Room 102", 25));
@@ -45,6 +56,12 @@ public class RoomManagementView {
                     }
                 };
             }
+        });
+        roomList.getSelectionModel().selectedItemProperty().addListener((obs, oldSelection, newSelection) -> {
+            updateRoomSchedule(newSelection);
+        });
+        scheduleSessions.addListener((ListChangeListener<ExamSession>) change -> {
+            updateRoomSchedule(roomList.getSelectionModel().getSelectedItem());
         });
 
         Button addBtn = new Button("Add");
@@ -81,6 +98,7 @@ public class RoomManagementView {
         left.setPadding(new Insets(0, 10, 0, 0));
 
         root.setLeft(left);
+        root.setCenter(buildRoomSchedulePanel());
     }
 
     public ObservableList<Room> getRooms() {
@@ -89,6 +107,45 @@ public class RoomManagementView {
 
     public Parent getView() {
         return root;
+    }
+
+    private VBox buildRoomSchedulePanel() {
+        roomScheduleTitle = new Label("Room Schedule");
+        roomScheduleTitle.getStyleClass().add("view-subtitle");
+
+        TableColumn<ExamSession, LocalDate> dateCol = new TableColumn<>("Date");
+        dateCol.setCellValueFactory(cellData -> new SimpleObjectProperty<>(cellData.getValue().getTimeSlot().getDate()));
+
+        TableColumn<ExamSession, LocalTime> timeCol = new TableColumn<>("Time");
+        timeCol.setCellValueFactory(cellData -> new SimpleObjectProperty<>(cellData.getValue().getTimeSlot().getStartTime()));
+
+        TableColumn<ExamSession, String> courseCol = new TableColumn<>("Course");
+        courseCol.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue().getExam().getCourse().getCourseName()));
+
+        roomScheduleTable.getColumns().addAll(dateCol, timeCol, courseCol);
+        roomScheduleTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        roomScheduleTable.setPlaceholder(new Label("Select a room to view its schedule."));
+
+        VBox panel = new VBox(10, roomScheduleTitle, roomScheduleTable);
+        panel.setPadding(new Insets(0, 0, 0, 10));
+        return panel;
+    }
+
+    private void updateRoomSchedule(Room room) {
+        if (room == null) {
+            roomScheduleTitle.setText("Room Schedule");
+            roomScheduleTable.setItems(FXCollections.observableArrayList());
+            return;
+        }
+
+        roomScheduleTitle.setText("Room Schedule - " + room.getRoomName());
+        roomScheduleTable.setItems(
+                FXCollections.observableArrayList(
+                        scheduleSessions.stream()
+                                .filter(session -> session.getRoom() != null && room.equals(session.getRoom()))
+                                .collect(Collectors.toList())
+                )
+        );
     }
 
     private void showRoomDialog(Room room) {

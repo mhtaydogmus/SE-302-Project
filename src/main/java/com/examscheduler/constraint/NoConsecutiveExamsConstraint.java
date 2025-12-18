@@ -8,7 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
-public class NoOverlapConstraint extends Constraint {
+public class NoConsecutiveExamsConstraint extends Constraint {
 
     @Override
     public List<String> validate(Schedule schedule) {
@@ -21,20 +21,30 @@ public class NoOverlapConstraint extends Constraint {
         Set<Student> students = schedule.getAllStudents();
 
         for (Student student : students) {
-            List<ExamSession> studentSessions = schedule.getSessionsForStudent(student);
+            List<ExamSession> sessions = schedule.getSessionsForStudent(student);
 
-            for (int i = 0; i < studentSessions.size(); i++) {
-                ExamSession session1 = studentSessions.get(i);
+            for (int i = 0; i < sessions.size(); i++) {
+                ExamSession session1 = sessions.get(i);
+                if (session1.getTimeSlot() == null) {
+                    continue;
+                }
 
-                for (int j = i + 1; j < studentSessions.size(); j++) {
-                    ExamSession session2 = studentSessions.get(j);
+                for (int j = i + 1; j < sessions.size(); j++) {
+                    ExamSession session2 = sessions.get(j);
+                    if (session2.getTimeSlot() == null) {
+                        continue;
+                    }
 
-                    if (session1.getTimeSlot() != null &&
-                        session2.getTimeSlot() != null &&
-                        session1.getTimeSlot().overlaps(session2.getTimeSlot())) {
+                    if (!session1.getTimeSlot().getDate().equals(session2.getTimeSlot().getDate())) {
+                        continue;
+                    }
 
+                    boolean consecutive = session1.getTimeSlot().getEndTime().equals(session2.getTimeSlot().getStartTime()) ||
+                        session2.getTimeSlot().getEndTime().equals(session1.getTimeSlot().getStartTime());
+
+                    if (consecutive) {
                         String violation = String.format(
-                            "OVERLAP VIOLATION: Student %s (%s) has overlapping exams: " +
+                            "CONSECUTIVE EXAMS VIOLATION: Student %s (%s) has back-to-back exams: " +
                             "Session %s at %s and Session %s at %s",
                             student.getStudentId(),
                             student.getFullName(),

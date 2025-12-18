@@ -1,8 +1,12 @@
 package edu.ieu.se302.examscheduler.ui.views;
 
 import com.examscheduler.entity.Course;
+import com.examscheduler.entity.ExamSession;
+import javafx.beans.property.SimpleObjectProperty;
+import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.collections.ListChangeListener;
 import javafx.geometry.Insets;
 import javafx.scene.Parent;
 import javafx.scene.control.*;
@@ -12,15 +16,22 @@ import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.util.Callback;
 
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 public class CourseManagementView {
 
     private final BorderPane root = new BorderPane();
     private final ObservableList<Course> courses = FXCollections.observableArrayList();
     private final ListView<Course> courseList = new ListView<>(courses);
+    private final ObservableList<ExamSession> scheduleSessions;
+    private final TableView<ExamSession> courseScheduleTable = new TableView<>();
+    private Label courseScheduleTitle;
 
-    public CourseManagementView() {
+    public CourseManagementView(ObservableList<ExamSession> scheduleSessions) {
+        this.scheduleSessions = scheduleSessions;
         // Sample Data
         courses.add(new Course("CS101", "Intro to Programming", "CS101", 6));
         courses.add(new Course("MATH201", "Calculus II", "MATH201", 4));
@@ -46,6 +57,12 @@ public class CourseManagementView {
                     }
                 };
             }
+        });
+        courseList.getSelectionModel().selectedItemProperty().addListener((obs, oldSelection, newSelection) -> {
+            updateCourseSchedule(newSelection);
+        });
+        scheduleSessions.addListener((ListChangeListener<ExamSession>) change -> {
+            updateCourseSchedule(courseList.getSelectionModel().getSelectedItem());
         });
 
         Button addBtn = new Button("Add");
@@ -82,6 +99,7 @@ public class CourseManagementView {
         left.setPadding(new Insets(0, 10, 0, 0));
 
         root.setLeft(left);
+        root.setCenter(buildCourseSchedulePanel());
     }
 
     public ObservableList<Course> getCourses() {
@@ -90,6 +108,45 @@ public class CourseManagementView {
 
     public Parent getView() {
         return root;
+    }
+
+    private VBox buildCourseSchedulePanel() {
+        courseScheduleTitle = new Label("Course Schedule");
+        courseScheduleTitle.getStyleClass().add("view-subtitle");
+
+        TableColumn<ExamSession, LocalDate> dateCol = new TableColumn<>("Date");
+        dateCol.setCellValueFactory(cellData -> new SimpleObjectProperty<>(cellData.getValue().getTimeSlot().getDate()));
+
+        TableColumn<ExamSession, LocalTime> timeCol = new TableColumn<>("Time");
+        timeCol.setCellValueFactory(cellData -> new SimpleObjectProperty<>(cellData.getValue().getTimeSlot().getStartTime()));
+
+        TableColumn<ExamSession, String> roomCol = new TableColumn<>("Room");
+        roomCol.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue().getRoom().getRoomName()));
+
+        courseScheduleTable.getColumns().addAll(dateCol, timeCol, roomCol);
+        courseScheduleTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
+        courseScheduleTable.setPlaceholder(new Label("Select a course to view its schedule."));
+
+        VBox panel = new VBox(10, courseScheduleTitle, courseScheduleTable);
+        panel.setPadding(new Insets(0, 0, 0, 10));
+        return panel;
+    }
+
+    private void updateCourseSchedule(Course course) {
+        if (course == null) {
+            courseScheduleTitle.setText("Course Schedule");
+            courseScheduleTable.setItems(FXCollections.observableArrayList());
+            return;
+        }
+
+        courseScheduleTitle.setText("Course Schedule - " + course.getCourseName());
+        courseScheduleTable.setItems(
+                FXCollections.observableArrayList(
+                        scheduleSessions.stream()
+                                .filter(session -> session.getExam() != null && course.equals(session.getExam().getCourse()))
+                                .collect(Collectors.toList())
+                )
+        );
     }
 
     private void showCourseDialog(Course course) {

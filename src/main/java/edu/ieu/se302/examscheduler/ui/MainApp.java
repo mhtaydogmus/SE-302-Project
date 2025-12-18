@@ -3,6 +3,7 @@ package edu.ieu.se302.examscheduler.ui;
 import javafx.application.Application;
 import javafx.scene.Scene;
 import javafx.stage.Stage;
+import edu.ieu.se302.examscheduler.ui.util.I18n;
 
 /**
  * JavaFX entry point for the Student Exam Scheduling System (GUI Skeleton).
@@ -12,10 +13,11 @@ public class MainApp extends Application {
 
     @Override
     public void start(Stage primaryStage) {
+        I18n.setLocale(java.util.Locale.ENGLISH);
         MainWindow window = new MainWindow();
 
         Scene scene = new Scene(window.getRoot(), 1100, 700);
-        primaryStage.setTitle("Student Exam Scheduling System");
+        primaryStage.setTitle(I18n.get("app.title"));
         primaryStage.setScene(scene);
         primaryStage.setMinWidth(900);
         primaryStage.setMinHeight(600);

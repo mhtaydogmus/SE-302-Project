@@ -10,6 +10,7 @@ public class Student {
     private String firstName;
     private String lastName;
     private String email;
+    private String gender;
     private List<Enrollment> enrollments;
     private List<ExamSession> assignedSessions;
 
@@ -18,14 +19,20 @@ public class Student {
         this.assignedSessions = new ArrayList<>();
     }
 
-    public Student(String studentId, String firstName, String lastName, String email) {
+    public Student(String studentId, String firstName, String lastName, String email, String gender) {
         this.studentId = studentId;
         this.firstName = firstName;
         this.lastName = lastName;
         this.email = email;
+        this.gender = gender;
         this.enrollments = new ArrayList<>();
         this.assignedSessions = new ArrayList<>();
     }
+    
+    public Student(String studentId, String firstName, String lastName, String email) {
+        this(studentId, firstName, lastName, email, "Not specified");
+    }
+
 
     public int getDailyExamCount(LocalDate date) {
         if (date == null) {
@@ -120,6 +127,15 @@ public class Student {
         this.email = email;
     }
 
+    public String getGender() {
+        return gender;
+    }
+
+    public void setGender(String gender) {
+        this.gender = gender;
+    }
+
+
     public List<Enrollment> getEnrollments() {
         return new ArrayList<>(enrollments);
     }
@@ -155,6 +171,7 @@ public class Student {
                 "studentId='" + studentId + '\'' +
                 ", fullName='" + getFullName() + '\'' +
                 ", email='" + email + '\'' +
+                ", gender='" + gender + '\'' +
                 ", enrollmentCount=" + enrollments.size() +
                 ", assignedSessionCount=" + assignedSessions.size() +
                 '}';
