@@ -119,7 +119,18 @@ public class ScheduleGenerationView {
 
     private void setupTable() {
         TableColumn<ExamSession, String> courseCol = new TableColumn<>("Course");
-        courseCol.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue().getExam().getCourse().getCourseName()));
+        courseCol.setCellValueFactory(cellData -> {
+            ExamSession session = cellData.getValue();
+            if (session == null || session.getExam() == null || session.getExam().getCourse() == null) {
+                return new SimpleStringProperty("N/A");
+            }
+            String name = session.getExam().getCourse().getCourseName();
+            if (name == null || name.isBlank()) {
+                String code = session.getExam().getCourse().getCourseCode();
+                return new SimpleStringProperty(code != null && !code.isBlank() ? code : "N/A");
+            }
+            return new SimpleStringProperty(name);
+        });
 
         TableColumn<ExamSession, String> roomCol = new TableColumn<>("Room");
         roomCol.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue().getRoom().getRoomName()));
@@ -139,6 +150,15 @@ public class ScheduleGenerationView {
         scheduleTable.getColumns().addAll(courseCol, roomCol, dateCol, startCol, endCol, enrolledCol);
         scheduleTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
         scheduleTable.setItems(filteredScheduleSessions);
+        scheduleTable.setRowFactory(tv -> {
+            TableRow<ExamSession> row = new TableRow<>();
+            row.setOnMouseClicked(event -> {
+                if (event.getClickCount() == 2 && !row.isEmpty()) {
+                    showSessionStudents(row.getItem());
+                }
+            });
+            return row;
+        });
     }
 
     private void setupStudentDetailsPanel() {
@@ -339,5 +359,29 @@ public class ScheduleGenerationView {
             alert.setContentText("Failed to print the schedule.");
             alert.showAndWait();
         }
+    }
+
+    private void showSessionStudents(ExamSession session) {
+        if (session == null) {
+            return;
+        }
+        List<Student> assigned = session.getAssignedStudents();
+        StringBuilder sb = new StringBuilder();
+        if (assigned.isEmpty()) {
+            sb.append("No students assigned.");
+        } else {
+            for (Student s : assigned) {
+                sb.append(s.getStudentId()).append(" - ").append(s.getFullName()).append("\n");
+            }
+        }
+
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle("Assigned Students");
+        alert.setHeaderText("Exam Session: " + session.getSessionId());
+        TextArea textArea = new TextArea(sb.toString());
+        textArea.setEditable(false);
+        textArea.setWrapText(true);
+        alert.getDialogPane().setContent(textArea);
+        alert.showAndWait();
     }
 }

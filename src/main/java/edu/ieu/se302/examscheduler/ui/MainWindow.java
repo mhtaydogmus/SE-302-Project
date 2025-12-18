@@ -43,11 +43,16 @@ public class MainWindow {
     private Path lastRoomsPath;
     private Path lastTimeSlotsPath;
     private Path lastExamsPath;
+    private Path lastAttendancePath;
     private MenuItem reimportItem;
+    private MenuItem reimportStudentsItem;
+    private MenuItem reimportCoursesItem;
+    private MenuItem reimportRoomsItem;
+    private MenuItem reimportAttendanceItem;
 
-    private final StudentManagementView studentView = new StudentManagementView(enrollments);
     private final CourseManagementView courseView = new CourseManagementView(scheduleSessions, enrollments);
     private final RoomManagementView roomView = new RoomManagementView(scheduleSessions);
+    private final StudentManagementView studentView = new StudentManagementView(enrollments, courseView.getCourses(), roomView.getRooms());
     private final TimeSlotManagementView timeSlotView = new TimeSlotManagementView();
     private final ExamManagementView examView = new ExamManagementView(exams, courseView.getCourses());
     private final EnrollmentManagementView enrollmentView = new EnrollmentManagementView(enrollments, studentView.getStudents(), courseView.getCourses());
@@ -81,12 +86,44 @@ public class MainWindow {
         Menu file = new Menu(I18n.get("menu.file"));
         MenuItem importItem = new MenuItem(I18n.get("menu.file.import"));
         importItem.setOnAction(e -> importDataFiles());
+        MenuItem importStudentsItem = new MenuItem(I18n.get("menu.file.import.students"));
+        importStudentsItem.setOnAction(e -> importStudentsOnly());
+        MenuItem importCoursesItem = new MenuItem(I18n.get("menu.file.import.courses"));
+        importCoursesItem.setOnAction(e -> importCoursesOnly());
+        MenuItem importRoomsItem = new MenuItem(I18n.get("menu.file.import.rooms"));
+        importRoomsItem.setOnAction(e -> importRoomsOnly());
+        MenuItem importAttendanceItem = new MenuItem(I18n.get("menu.file.import.attendance"));
+        importAttendanceItem.setOnAction(e -> importAttendanceOnly());
         reimportItem = new MenuItem(I18n.get("menu.file.reimport"));
         reimportItem.setDisable(true);
         reimportItem.setOnAction(e -> reimportLastFiles());
+        reimportStudentsItem = new MenuItem(I18n.get("menu.file.reimport.students"));
+        reimportStudentsItem.setDisable(true);
+        reimportStudentsItem.setOnAction(e -> reimportStudentsOnly());
+        reimportCoursesItem = new MenuItem(I18n.get("menu.file.reimport.courses"));
+        reimportCoursesItem.setDisable(true);
+        reimportCoursesItem.setOnAction(e -> reimportCoursesOnly());
+        reimportRoomsItem = new MenuItem(I18n.get("menu.file.reimport.rooms"));
+        reimportRoomsItem.setDisable(true);
+        reimportRoomsItem.setOnAction(e -> reimportRoomsOnly());
+        reimportAttendanceItem = new MenuItem(I18n.get("menu.file.reimport.attendance"));
+        reimportAttendanceItem.setDisable(true);
+        reimportAttendanceItem.setOnAction(e -> reimportAttendanceOnly());
         MenuItem exit = new MenuItem(I18n.get("menu.file.exit"));
         exit.setOnAction(e -> root.getScene().getWindow().hide());
-        file.getItems().addAll(importItem, reimportItem, exit);
+        file.getItems().addAll(
+                importItem,
+                importStudentsItem,
+                importCoursesItem,
+                importRoomsItem,
+                importAttendanceItem,
+                reimportItem,
+                reimportStudentsItem,
+                reimportCoursesItem,
+                reimportRoomsItem,
+                reimportAttendanceItem,
+                exit
+        );
 
         Menu data = new Menu(I18n.get("menu.data"));
         MenuItem students = new MenuItem(I18n.get("menu.data.students"));
@@ -162,6 +199,95 @@ public class MainWindow {
         }
     }
 
+    private void importStudentsOnly() {
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("CSV Files", "*.csv"));
+        fileChooser.setTitle("Select Students CSV");
+        File studentsFile = fileChooser.showOpenDialog(root.getScene().getWindow());
+        if (studentsFile == null) {
+            return;
+        }
+        try {
+            List<com.examscheduler.entity.Student> importedStudents = CsvImportService.importStudents(studentsFile.toPath());
+            studentView.getStudents().setAll(importedStudents);
+            enrollments.clear();
+            scheduleSessions.clear();
+            lastStudentsPath = studentsFile.toPath();
+            reimportStudentsItem.setDisable(false);
+        } catch (IllegalArgumentException ex) {
+            showError(I18n.get("dialog.error.import.title"), ex.getMessage());
+        } catch (Exception ex) {
+            showError(I18n.get("dialog.error.import.title"), I18n.get("dialog.error.import.generic"));
+        }
+    }
+
+    private void importCoursesOnly() {
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("CSV Files", "*.csv"));
+        fileChooser.setTitle("Select Courses CSV");
+        File coursesFile = fileChooser.showOpenDialog(root.getScene().getWindow());
+        if (coursesFile == null) {
+            return;
+        }
+        try {
+            List<com.examscheduler.entity.Course> importedCourses = CsvImportService.importCourses(coursesFile.toPath());
+            courseView.getCourses().setAll(importedCourses);
+            enrollments.clear();
+            exams.clear();
+            scheduleSessions.clear();
+            lastCoursesPath = coursesFile.toPath();
+            reimportCoursesItem.setDisable(false);
+        } catch (IllegalArgumentException ex) {
+            showError(I18n.get("dialog.error.import.title"), ex.getMessage());
+        } catch (Exception ex) {
+            showError(I18n.get("dialog.error.import.title"), I18n.get("dialog.error.import.generic"));
+        }
+    }
+
+    private void importRoomsOnly() {
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("CSV Files", "*.csv"));
+        fileChooser.setTitle("Select Rooms CSV");
+        File roomsFile = fileChooser.showOpenDialog(root.getScene().getWindow());
+        if (roomsFile == null) {
+            return;
+        }
+        try {
+            List<com.examscheduler.entity.Room> importedRooms = CsvImportService.importRooms(roomsFile.toPath());
+            roomView.getRooms().setAll(importedRooms);
+            scheduleSessions.clear();
+            lastRoomsPath = roomsFile.toPath();
+            reimportRoomsItem.setDisable(false);
+        } catch (IllegalArgumentException ex) {
+            showError(I18n.get("dialog.error.import.title"), ex.getMessage());
+        } catch (Exception ex) {
+            showError(I18n.get("dialog.error.import.title"), I18n.get("dialog.error.import.generic"));
+        }
+    }
+
+    private void importAttendanceOnly() {
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("CSV Files", "*.csv"));
+        fileChooser.setTitle("Select Attendance CSV");
+        File attendanceFile = fileChooser.showOpenDialog(root.getScene().getWindow());
+        if (attendanceFile == null) {
+            return;
+        }
+        try {
+            clearEnrollments();
+            List<com.examscheduler.entity.Enrollment> importedEnrollments =
+                    CsvImportService.importAttendance(attendanceFile.toPath(), studentView.getStudents(), courseView.getCourses());
+            enrollments.setAll(importedEnrollments);
+            lastAttendancePath = attendanceFile.toPath();
+            reimportAttendanceItem.setDisable(false);
+            scheduleSessions.clear();
+        } catch (IllegalArgumentException ex) {
+            showError(I18n.get("dialog.error.import.title"), ex.getMessage());
+        } catch (Exception ex) {
+            showError(I18n.get("dialog.error.import.title"), I18n.get("dialog.error.import.generic"));
+        }
+    }
+
     private void reimportLastFiles() {
         if (lastStudentsPath == null || lastCoursesPath == null || lastRoomsPath == null ||
             lastTimeSlotsPath == null || lastExamsPath == null) {
@@ -175,6 +301,89 @@ public class MainWindow {
         } catch (Exception ex) {
             showError(I18n.get("dialog.error.import.title"), I18n.get("dialog.error.reimport.generic"));
         }
+    }
+
+    private void reimportStudentsOnly() {
+        if (lastStudentsPath == null) {
+            showError(I18n.get("dialog.error.reimport.title"), I18n.get("dialog.error.reimport.missing"));
+            return;
+        }
+        try {
+            List<com.examscheduler.entity.Student> importedStudents = CsvImportService.importStudents(lastStudentsPath);
+            studentView.getStudents().setAll(importedStudents);
+            enrollments.clear();
+            scheduleSessions.clear();
+        } catch (IllegalArgumentException ex) {
+            showError(I18n.get("dialog.error.import.title"), ex.getMessage());
+        } catch (Exception ex) {
+            showError(I18n.get("dialog.error.import.title"), I18n.get("dialog.error.import.generic"));
+        }
+    }
+
+    private void reimportCoursesOnly() {
+        if (lastCoursesPath == null) {
+            showError(I18n.get("dialog.error.reimport.title"), I18n.get("dialog.error.reimport.missing"));
+            return;
+        }
+        try {
+            List<com.examscheduler.entity.Course> importedCourses = CsvImportService.importCourses(lastCoursesPath);
+            courseView.getCourses().setAll(importedCourses);
+            enrollments.clear();
+            exams.clear();
+            scheduleSessions.clear();
+        } catch (IllegalArgumentException ex) {
+            showError(I18n.get("dialog.error.import.title"), ex.getMessage());
+        } catch (Exception ex) {
+            showError(I18n.get("dialog.error.import.title"), I18n.get("dialog.error.import.generic"));
+        }
+    }
+
+    private void reimportRoomsOnly() {
+        if (lastRoomsPath == null) {
+            showError(I18n.get("dialog.error.reimport.title"), I18n.get("dialog.error.reimport.missing"));
+            return;
+        }
+        try {
+            List<com.examscheduler.entity.Room> importedRooms = CsvImportService.importRooms(lastRoomsPath);
+            roomView.getRooms().setAll(importedRooms);
+            scheduleSessions.clear();
+        } catch (IllegalArgumentException ex) {
+            showError(I18n.get("dialog.error.import.title"), ex.getMessage());
+        } catch (Exception ex) {
+            showError(I18n.get("dialog.error.import.title"), I18n.get("dialog.error.import.generic"));
+        }
+    }
+
+    private void reimportAttendanceOnly() {
+        if (lastAttendancePath == null) {
+            showError(I18n.get("dialog.error.reimport.title"), I18n.get("dialog.error.reimport.missing"));
+            return;
+        }
+        try {
+            clearEnrollments();
+            List<com.examscheduler.entity.Enrollment> importedEnrollments =
+                    CsvImportService.importAttendance(lastAttendancePath, studentView.getStudents(), courseView.getCourses());
+            enrollments.setAll(importedEnrollments);
+            scheduleSessions.clear();
+        } catch (IllegalArgumentException ex) {
+            showError(I18n.get("dialog.error.import.title"), ex.getMessage());
+        } catch (Exception ex) {
+            showError(I18n.get("dialog.error.import.title"), I18n.get("dialog.error.import.generic"));
+        }
+    }
+
+    private void clearEnrollments() {
+        for (com.examscheduler.entity.Student student : studentView.getStudents()) {
+            for (com.examscheduler.entity.Enrollment enrollment : student.getEnrollments()) {
+                student.removeEnrollment(enrollment);
+            }
+        }
+        for (com.examscheduler.entity.Course course : courseView.getCourses()) {
+            for (com.examscheduler.entity.Enrollment enrollment : course.getEnrollments()) {
+                course.removeEnrollment(enrollment);
+            }
+        }
+        enrollments.clear();
     }
 
     private void importFromPaths(Path studentsPath, Path coursesPath, Path roomsPath, Path timeSlotsPath, Path examsPath) throws Exception {

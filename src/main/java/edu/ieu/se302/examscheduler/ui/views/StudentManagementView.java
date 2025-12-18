@@ -28,7 +28,11 @@ public class StudentManagementView {
     private final BorderPane root = new BorderPane();
     private final ObservableList<Student> students = FXCollections.observableArrayList();
     private final ObservableList<Enrollment> enrollments;
+    private final ObservableList<Course> courses;
+    private final ObservableList<com.examscheduler.entity.Room> rooms;
     private final ListView<Student> studentList = new ListView<>(students);
+    private final ListView<Course> courseList;
+    private final ListView<com.examscheduler.entity.Room> roomList;
     private VBox detailsPanel;
     private Label studentNameLabel;
     private Label studentIdLabel;
@@ -37,8 +41,12 @@ public class StudentManagementView {
     private TableView<ExamSession> upcomingExamsTable;
 
 
-    public StudentManagementView(ObservableList<Enrollment> enrollments) {
+    public StudentManagementView(ObservableList<Enrollment> enrollments, ObservableList<Course> courses, ObservableList<com.examscheduler.entity.Room> rooms) {
         this.enrollments = enrollments;
+        this.courses = courses;
+        this.rooms = rooms;
+        this.courseList = new ListView<>(courses);
+        this.roomList = new ListView<>(rooms);
         // Sample Data
         students.add(new Student("101", "Ali", "Veli", "ali@mail.com", "Male"));
         students.add(new Student("102", "Ayşe", "Fatma", "ayse@mail.com", "Female"));
@@ -67,6 +75,30 @@ public class StudentManagementView {
                 hideStudentDetails();
             }
         });
+        courseList.setCellFactory(param -> new ListCell<>() {
+            @Override
+            protected void updateItem(Course item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                } else {
+                    setText(item.getCourseCode() + " - " + item.getCourseName());
+                }
+            }
+        });
+        courseList.setPrefHeight(150);
+        roomList.setCellFactory(param -> new ListCell<>() {
+            @Override
+            protected void updateItem(com.examscheduler.entity.Room item, boolean empty) {
+                super.updateItem(item, empty);
+                if (empty || item == null) {
+                    setText(null);
+                } else {
+                    setText(item.getRoomName() + " (Cap: " + item.getCapacity() + ")");
+                }
+            }
+        });
+        roomList.setPrefHeight(150);
 
         Button addBtn = new Button("Add");
         addBtn.setOnAction(e -> showStudentDialog(null));
@@ -99,7 +131,16 @@ public class StudentManagementView {
         });
 
         HBox buttons = new HBox(8, addBtn, editBtn, deleteBtn);
-        VBox left = new VBox(10, title, new Label("Students"), studentList, buttons);
+        VBox left = new VBox(10,
+                title,
+                new Label("Students"),
+                studentList,
+                buttons,
+                new Label("Courses"),
+                courseList,
+                new Label("Rooms"),
+                roomList
+        );
         left.setPadding(new Insets(0, 10, 0, 0));
 
         root.setCenter(left);
