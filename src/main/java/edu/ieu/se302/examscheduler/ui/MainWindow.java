@@ -48,6 +48,7 @@ public class MainWindow {
     private MenuItem reimportStudentsItem;
     private MenuItem reimportCoursesItem;
     private MenuItem reimportRoomsItem;
+    private MenuItem reimportExamsItem;
     private MenuItem reimportAttendanceItem;
 
     private final CourseManagementView courseView = new CourseManagementView(scheduleSessions, enrollments);
@@ -94,6 +95,8 @@ public class MainWindow {
         importRoomsItem.setOnAction(e -> importRoomsOnly());
         MenuItem importAttendanceItem = new MenuItem(I18n.get("menu.file.import.attendance"));
         importAttendanceItem.setOnAction(e -> importAttendanceOnly());
+        MenuItem importExamsItem = new MenuItem(I18n.get("menu.file.import.exams"));
+        importExamsItem.setOnAction(e -> importExamsOnly());
         reimportItem = new MenuItem(I18n.get("menu.file.reimport"));
         reimportItem.setDisable(true);
         reimportItem.setOnAction(e -> reimportLastFiles());
@@ -106,6 +109,9 @@ public class MainWindow {
         reimportRoomsItem = new MenuItem(I18n.get("menu.file.reimport.rooms"));
         reimportRoomsItem.setDisable(true);
         reimportRoomsItem.setOnAction(e -> reimportRoomsOnly());
+        reimportExamsItem = new MenuItem(I18n.get("menu.file.reimport.exams"));
+        reimportExamsItem.setDisable(true);
+        reimportExamsItem.setOnAction(e -> reimportExamsOnly());
         reimportAttendanceItem = new MenuItem(I18n.get("menu.file.reimport.attendance"));
         reimportAttendanceItem.setDisable(true);
         reimportAttendanceItem.setOnAction(e -> reimportAttendanceOnly());
@@ -116,11 +122,13 @@ public class MainWindow {
                 importStudentsItem,
                 importCoursesItem,
                 importRoomsItem,
+                importExamsItem,
                 importAttendanceItem,
                 reimportItem,
                 reimportStudentsItem,
                 reimportCoursesItem,
                 reimportRoomsItem,
+                reimportExamsItem,
                 reimportAttendanceItem,
                 exit
         );
@@ -265,6 +273,27 @@ public class MainWindow {
         }
     }
 
+    private void importExamsOnly() {
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("CSV Files", "*.csv"));
+        fileChooser.setTitle("Select Exams CSV");
+        File examsFile = fileChooser.showOpenDialog(root.getScene().getWindow());
+        if (examsFile == null) {
+            return;
+        }
+        try {
+            List<com.examscheduler.entity.Exam> importedExams = CsvImportService.importExams(examsFile.toPath(), courseView.getCourses());
+            exams.setAll(importedExams);
+            scheduleSessions.clear();
+            lastExamsPath = examsFile.toPath();
+            reimportExamsItem.setDisable(false);
+        } catch (IllegalArgumentException ex) {
+            showError(I18n.get("dialog.error.import.title"), ex.getMessage());
+        } catch (Exception ex) {
+            showError(I18n.get("dialog.error.import.title"), I18n.get("dialog.error.import.generic"));
+        }
+    }
+
     private void importAttendanceOnly() {
         FileChooser fileChooser = new FileChooser();
         fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("CSV Files", "*.csv"));
@@ -346,6 +375,22 @@ public class MainWindow {
         try {
             List<com.examscheduler.entity.Room> importedRooms = CsvImportService.importRooms(lastRoomsPath);
             roomView.getRooms().setAll(importedRooms);
+            scheduleSessions.clear();
+        } catch (IllegalArgumentException ex) {
+            showError(I18n.get("dialog.error.import.title"), ex.getMessage());
+        } catch (Exception ex) {
+            showError(I18n.get("dialog.error.import.title"), I18n.get("dialog.error.import.generic"));
+        }
+    }
+
+    private void reimportExamsOnly() {
+        if (lastExamsPath == null) {
+            showError(I18n.get("dialog.error.reimport.title"), I18n.get("dialog.error.reimport.missing"));
+            return;
+        }
+        try {
+            List<com.examscheduler.entity.Exam> importedExams = CsvImportService.importExams(lastExamsPath, courseView.getCourses());
+            exams.setAll(importedExams);
             scheduleSessions.clear();
         } catch (IllegalArgumentException ex) {
             showError(I18n.get("dialog.error.import.title"), ex.getMessage());

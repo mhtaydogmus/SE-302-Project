@@ -38,13 +38,13 @@ public final class CsvImportService {
         } else {
             int studentIdIndex = resolveHeaderIndex(headers, path, "studentid",
                     new String[]{"student_id", "student id", "std_id", "stdid", "id"});
-            int firstNameIndex = resolveHeaderIndex(headers, path, "firstname",
+            int firstNameIndex = resolveOptionalHeaderIndex(headers, "firstname",
                     new String[]{"first_name", "first name", "givenname", "given_name"});
-            int lastNameIndex = resolveHeaderIndex(headers, path, "lastname",
+            int lastNameIndex = resolveOptionalHeaderIndex(headers, "lastname",
                     new String[]{"last_name", "last name", "surname", "familyname", "family_name"});
-            int emailIndex = resolveHeaderIndex(headers, path, "email",
+            int emailIndex = resolveOptionalHeaderIndex(headers, "email",
                     new String[]{"email_address", "email address"});
-            int genderIndex = resolveHeaderIndex(headers, path, "gender",
+            int genderIndex = resolveOptionalHeaderIndex(headers, "gender",
                     new String[]{"sex"});
 
             for (int i = 1; i < rows.size(); i++) {
@@ -83,13 +83,20 @@ public final class CsvImportService {
         if (isSingleColumnIdList(rows)) {
             parseSingleColumnCourseCodes(rows, courses, seenIds, path);
         } else {
-            int courseIdIndex = resolveHeaderIndex(headers, path, "courseid",
+            // CourseID and CourseCode are interchangeable - require one OR the other
+            int courseIdIndex = resolveOptionalHeaderIndex(headers, "courseid",
                     new String[]{"course_id", "course id", "id"});
-            int courseNameIndex = resolveHeaderIndex(headers, path, "coursename",
-                    new String[]{"course_name", "course name", "name"});
-            int courseCodeIndex = resolveHeaderIndex(headers, path, "coursecode",
+            int courseCodeIndex = resolveOptionalHeaderIndex(headers, "coursecode",
                     new String[]{"course_code", "course code", "code"});
-            int creditsIndex = resolveHeaderIndex(headers, path, "credits",
+
+            // Check that at least one identifier is present
+            if (courseIdIndex == -1 && courseCodeIndex == -1) {
+                throw new IllegalArgumentException("Missing required header 'courseid' or 'coursecode' in " + path.getFileName());
+            }
+
+            int courseNameIndex = resolveOptionalHeaderIndex(headers, "coursename",
+                    new String[]{"course_name", "course name", "name"});
+            int creditsIndex = resolveOptionalHeaderIndex(headers, "credits",
                     new String[]{"credit", "credit_hours", "credit hours"});
 
             for (int i = 1; i < rows.size(); i++) {
@@ -98,10 +105,24 @@ public final class CsvImportService {
                     continue;
                 }
 
+                // Try CourseID first, fall back to CourseCode
                 String id = getField(row, courseIdIndex);
+                if (id.isBlank()) {
+                    id = getField(row, courseCodeIndex);
+                }
+
                 String name = getField(row, courseNameIndex);
                 String code = getField(row, courseCodeIndex);
-                int credits = parseInt(getField(row, creditsIndex), "credits", i + 1, path);
+                if (code.isBlank()) {
+                    code = id; // Use ID as code if code not provided
+                }
+
+                // Parse credits with default value of 0
+                String creditsStr = getField(row, creditsIndex);
+                int credits = 0;
+                if (!creditsStr.isBlank()) {
+                    credits = parseInt(creditsStr, "credits", i + 1, path);
+                }
 
                 if (id.isBlank()) {
                     throw new IllegalArgumentException("Missing Course ID at line " + (i + 1) + " in " + path.getFileName());
@@ -129,7 +150,7 @@ public final class CsvImportService {
         } else {
             int roomIdIndex = resolveHeaderIndex(headers, path, "roomid",
                     new String[]{"room_id", "room id", "id", "classroomid", "classroom_id"});
-            int roomNameIndex = resolveHeaderIndex(headers, path, "roomname",
+            int roomNameIndex = resolveOptionalHeaderIndex(headers, "roomname",
                     new String[]{"room_name", "room name", "name", "classroom", "classroom_name"});
             int capacityIndex = resolveHeaderIndex(headers, path, "capacity",
                     new String[]{"room_capacity", "room capacity"});
@@ -195,8 +216,7 @@ public final class CsvImportService {
         Map<String, Integer> headers = mapHeaders(rows, path);
 
         requireHeader(headers, "examid", path);
-        requireHeader(headers, "examtype", path);
-        requireHeader(headers, "durationminutes", path);
+        // ExamType and DurationMinutes are now optional
         if (!headers.containsKey("courseid") && !headers.containsKey("coursecode")) {
             throw new IllegalArgumentException("Missing required header 'courseid' or 'coursecode' in " + path.getFileName());
         }
@@ -224,7 +244,13 @@ public final class CsvImportService {
                 courseIdentifier = getField(headers, row, "coursecode");
             }
             String examType = getField(headers, row, "examtype");
-            int durationMinutes = parseInt(getField(headers, row, "durationminutes"), "duration minutes", i + 1, path);
+
+            // DurationMinutes is optional - default to 120 minutes (2 hours)
+            String durationStr = getField(headers, row, "durationminutes");
+            int durationMinutes = 120; // Default value
+            if (!durationStr.isBlank()) {
+                durationMinutes = parseInt(durationStr, "duration minutes", i + 1, path);
+            }
 
             if (examId.isBlank()) {
                 throw new IllegalArgumentException("Missing Exam ID at line " + (i + 1) + " in " + path.getFileName());
@@ -393,6 +419,20 @@ public final class CsvImportService {
             }
         }
         throw new IllegalArgumentException("Missing required header '" + canonical + "' in " + path.getFileName());
+    }
+
+    private static int resolveOptionalHeaderIndex(Map<String, Integer> headers, String canonical, String[] aliases) {
+        Integer index = headers.get(canonical);
+        if (index != null) {
+            return index;
+        }
+        for (String alias : aliases) {
+            index = headers.get(alias);
+            if (index != null) {
+                return index;
+            }
+        }
+        return -1; // Return -1 for missing optional headers
     }
 
     private static String getField(Map<String, Integer> headers, List<String> row, String headerName) {

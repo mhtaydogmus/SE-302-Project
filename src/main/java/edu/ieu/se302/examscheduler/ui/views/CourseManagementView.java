@@ -35,10 +35,6 @@ public class CourseManagementView {
     public CourseManagementView(ObservableList<ExamSession> scheduleSessions, ObservableList<Enrollment> enrollments) {
         this.scheduleSessions = scheduleSessions;
         this.enrollments = enrollments;
-        // Sample Data
-        courses.add(new Course("CS101", "Intro to Programming", "CS101", 6));
-        courses.add(new Course("MATH201", "Calculus II", "MATH201", 4));
-
 
         root.setPadding(new Insets(10));
 

@@ -12,7 +12,7 @@ import javafx.collections.transformation.FilteredList;
 import javafx.geometry.Insets;
 import javafx.scene.Parent;
 import javafx.scene.control.*;
-import javafx.print.PrinterJob;
+import javafx.stage.FileChooser;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
@@ -78,11 +78,11 @@ public class ScheduleGenerationView {
         Button generateBtn = new Button("Generate Schedule");
         generateBtn.setOnAction(e -> generateSchedule());
 
-        Button generatePrintBtn = new Button("Generate & Print");
-        generatePrintBtn.setOnAction(e -> {
+        Button exportCsvBtn = new Button("Generate & Export CSV");
+        exportCsvBtn.setOnAction(e -> {
             Schedule schedule = generateSchedule();
             if (schedule != null) {
-                printSchedule();
+                exportScheduleToCsv();
             }
         });
 
@@ -91,7 +91,7 @@ public class ScheduleGenerationView {
 
         maxExamsPerDaySpinner.setEditable(true);
         maxExamsPerDaySpinner.setId("maxExamsPerDaySpinner");
-        HBox buttons = new HBox(8, generateBtn, generatePrintBtn, bulkGenerateSlotsBtn);
+        HBox buttons = new HBox(8, generateBtn, exportCsvBtn, bulkGenerateSlotsBtn);
         HBox dateFilterRow = new HBox(8, new Label("Filter Date:"), scheduleDatePicker, clearDateFilterButton);
         HBox maxExamsRow = new HBox(8, new Label("Max Exams/Day:"), maxExamsPerDaySpinner);
         scheduleDatePicker.setId("scheduleDatePicker");
@@ -237,7 +237,20 @@ public class ScheduleGenerationView {
         });
 
         TableColumn<ExamSession, String> roomCol = new TableColumn<>("Room");
-        roomCol.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue().getRoom().getRoomName()));
+        roomCol.setCellValueFactory(cellData -> {
+            ExamSession session = cellData.getValue();
+            Room room = session != null ? session.getRoom() : null;
+            if (room == null) {
+                return new SimpleStringProperty("N/A");
+            }
+            // Prefer roomName, fallback to roomId if name is empty
+            String roomName = room.getRoomName();
+            if (roomName != null && !roomName.isBlank()) {
+                return new SimpleStringProperty(roomName);
+            }
+            String roomId = room.getRoomId();
+            return new SimpleStringProperty(roomId != null && !roomId.isBlank() ? roomId : "N/A");
+        });
 
         TableColumn<ExamSession, LocalDate> dateCol = new TableColumn<>("Date");
         dateCol.setCellValueFactory(cellData -> new SimpleObjectProperty<>(cellData.getValue().getTimeSlot().getDate()));
@@ -246,12 +259,20 @@ public class ScheduleGenerationView {
         startCol.setCellValueFactory(cellData -> new SimpleObjectProperty<>(cellData.getValue().getTimeSlot().getStartTime()));
 
         TableColumn<ExamSession, LocalTime> endCol = new TableColumn<>("End Time");
-        endCol.setCellValueFactory(cellData -> new SimpleObjectProperty<>(cellData.getValue().getTimeSlot().getEndTime()));
+        endCol.setCellValueFactory(cellData -> new SimpleObjectProperty<>(cellData.getValue().getActualEndTime()));
+
+        TableColumn<ExamSession, Number> durationCol = new TableColumn<>("Duration (min)");
+        durationCol.setCellValueFactory(cellData -> {
+            ExamSession session = cellData.getValue();
+            Exam exam = session != null ? session.getExam() : null;
+            int duration = exam != null ? exam.getDurationMinutes() : 0;
+            return new SimpleIntegerProperty(duration);
+        });
 
         TableColumn<ExamSession, Number> enrolledCol = new TableColumn<>("Students");
         enrolledCol.setCellValueFactory(cellData -> new SimpleIntegerProperty(cellData.getValue().getAssignedStudents().size()));
 
-        scheduleTable.getColumns().addAll(courseCol, roomCol, dateCol, startCol, endCol, enrolledCol);
+        scheduleTable.getColumns().addAll(courseCol, roomCol, dateCol, startCol, endCol, durationCol, enrolledCol);
         scheduleTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
         scheduleTable.setItems(filteredScheduleSessions);
         scheduleTable.setRowFactory(tv -> {
@@ -389,13 +410,20 @@ public class ScheduleGenerationView {
     }
 
     private Schedule generateSchedule() {
-        if (students.isEmpty() || courses.isEmpty() || rooms.isEmpty() || timeSlots.isEmpty()) {
+        if (students.isEmpty() || courses.isEmpty() || rooms.isEmpty()) {
             Alert alert = new Alert(Alert.AlertType.WARNING);
             alert.setTitle("Cannot Generate Schedule");
             alert.setHeaderText(null);
-            alert.setContentText("Please add students, courses, rooms, and time slots before generating a schedule.");
+            alert.setContentText("Please add students, courses, and rooms before generating a schedule.");
             alert.showAndWait();
             return null;
+        }
+
+        // Auto-generate time slots if none exist
+        if (timeSlots.isEmpty()) {
+            if (!autoGenerateTimeSlots()) {
+                return null; // User cancelled or error occurred
+            }
         }
 
         boolean hasEnrollments = courses.stream().anyMatch(course -> !course.getEnrollments().isEmpty());
@@ -407,6 +435,10 @@ public class ScheduleGenerationView {
             alert.showAndWait();
             return null;
         }
+
+        // CRITICAL FIX: Clear all previous schedule state before regenerating
+        // This prevents old ExamSession references from causing conflicts
+        clearPreviousScheduleState();
 
         // 1. Configure and run the scheduler (exams auto-generated from courses)
         int maxExamsPerDay = maxExamsPerDaySpinner.getValue();
@@ -455,41 +487,243 @@ public class ScheduleGenerationView {
         return schedule;
     }
 
-    private void printSchedule() {
+    /**
+     * Clears all previous schedule state to prevent conflicts when regenerating.
+     * This is critical because students maintain bidirectional references to ExamSessions.
+     * Without this cleanup, old ExamSession objects remain in students' assignedSessions lists,
+     * causing false conflicts during scheduling (overlap detection, daily exam count, etc.)
+     */
+    private void clearPreviousScheduleState() {
+        // Clear all exam session assignments from all students
+        for (Student student : students) {
+            if (student != null) {
+                // Clear the student's assigned sessions list
+                // This prevents old ExamSession references from interfering with new schedule generation
+                student.setAssignedSessions(new ArrayList<>());
+            }
+        }
+
+        // Clear the schedule sessions observable list
+        // This removes old sessions from the UI
+        scheduleSessions.clear();
+    }
+
+    /**
+     * Automatically generates time slots when none exist.
+     * Shows a dialog to get exam period and working hours from user.
+     *
+     * @return true if time slots were generated, false if user cancelled
+     */
+    private boolean autoGenerateTimeSlots() {
+        // Create dialog
+        Dialog<Pair<LocalDate, LocalDate>> dialog = new Dialog<>();
+        dialog.setTitle("Auto-Generate Time Slots");
+        dialog.setHeaderText("No time slots found. Let's create them automatically!");
+        dialog.setContentText("Specify the exam period and working hours:");
+
+        // Create form
+        GridPane grid = new GridPane();
+        grid.setHgap(10);
+        grid.setVgap(10);
+        grid.setPadding(new Insets(20, 150, 10, 10));
+
+        // Input fields
+        DatePicker startDatePicker = new DatePicker(LocalDate.now().plusDays(7));
+        DatePicker endDatePicker = new DatePicker(LocalDate.now().plusDays(14));
+
+        Spinner<Integer> startHourSpinner = new Spinner<>(0, 23, 9);
+        Spinner<Integer> startMinuteSpinner = new Spinner<>(0, 59, 0);
+        Spinner<Integer> endHourSpinner = new Spinner<>(0, 23, 17);
+        Spinner<Integer> endMinuteSpinner = new Spinner<>(0, 59, 0);
+        Spinner<Integer> durationSpinner = new Spinner<>(30, 300, 120, 30);
+        Spinner<Integer> bufferSpinner = new Spinner<>(0, 60, 15, 5);
+
+        startHourSpinner.setEditable(true);
+        startMinuteSpinner.setEditable(true);
+        endHourSpinner.setEditable(true);
+        endMinuteSpinner.setEditable(true);
+        durationSpinner.setEditable(true);
+        bufferSpinner.setEditable(true);
+
+        // Layout
+        grid.add(new Label("Exam Period:"), 0, 0);
+        grid.add(new Label("Start Date:"), 0, 1);
+        grid.add(startDatePicker, 1, 1);
+        grid.add(new Label("End Date:"), 0, 2);
+        grid.add(endDatePicker, 1, 2);
+
+        grid.add(new Label("Working Hours:"), 0, 3);
+        grid.add(new Label("Start Time:"), 0, 4);
+        HBox startTimeBox = new HBox(5, startHourSpinner, new Label(":"), startMinuteSpinner);
+        grid.add(startTimeBox, 1, 4);
+
+        grid.add(new Label("End Time:"), 0, 5);
+        HBox endTimeBox = new HBox(5, endHourSpinner, new Label(":"), endMinuteSpinner);
+        grid.add(endTimeBox, 1, 5);
+
+        grid.add(new Label("Exam Duration (min):"), 0, 6);
+        grid.add(durationSpinner, 1, 6);
+
+        grid.add(new Label("Buffer Time (min):"), 0, 7);
+        grid.add(bufferSpinner, 1, 7);
+
+        dialog.getDialogPane().setContent(grid);
+
+        // Buttons
+        ButtonType generateButtonType = new ButtonType("Generate", ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().addAll(generateButtonType, ButtonType.CANCEL);
+
+        // Result converter
+        dialog.setResultConverter(dialogButton -> {
+            if (dialogButton == generateButtonType) {
+                return new Pair<>(startDatePicker.getValue(), endDatePicker.getValue());
+            }
+            return null;
+        });
+
+        // Show dialog and process result
+        Optional<Pair<LocalDate, LocalDate>> result = dialog.showAndWait();
+
+        if (result.isPresent() && result.get() != null) {
+            LocalDate startDate = result.get().getKey();
+            LocalDate endDate = result.get().getValue();
+
+            if (startDate == null || endDate == null) {
+                showError("Invalid Input", "Please select both start and end dates.");
+                return false;
+            }
+
+            if (endDate.isBefore(startDate)) {
+                showError("Invalid Input", "End date must be after start date.");
+                return false;
+            }
+
+            LocalTime startTime = LocalTime.of(startHourSpinner.getValue(), startMinuteSpinner.getValue());
+            LocalTime endTime = LocalTime.of(endHourSpinner.getValue(), endMinuteSpinner.getValue());
+            int duration = durationSpinner.getValue();
+            int buffer = bufferSpinner.getValue();
+
+            // Generate time slots
+            List<TimeSlot> generatedSlots = TimeSlotGenerator.generateBulkTimeSlots(
+                startDate, endDate, startTime, endTime, duration, buffer
+            );
+
+            if (generatedSlots.isEmpty()) {
+                showError("Generation Failed", "No time slots could be generated with the given parameters.");
+                return false;
+            }
+
+            // Add to time slots list
+            timeSlots.addAll(generatedSlots);
+
+            // Show success message
+            Alert alert = new Alert(Alert.AlertType.INFORMATION);
+            alert.setTitle("Time Slots Generated");
+            alert.setHeaderText(null);
+            alert.setContentText("Successfully generated " + generatedSlots.size() + " time slots!\n\n" +
+                "Period: " + startDate + " to " + endDate + "\n" +
+                "Hours: " + startTime + " - " + endTime);
+            alert.showAndWait();
+
+            return true;
+        }
+
+        return false; // User cancelled
+    }
+
+    private void showError(String title, String message) {
+        Alert alert = new Alert(Alert.AlertType.ERROR);
+        alert.setTitle(title);
+        alert.setHeaderText(null);
+        alert.setContentText(message);
+        alert.showAndWait();
+    }
+
+    private void exportScheduleToCsv() {
         if (scheduleTable.getItems() == null || scheduleTable.getItems().isEmpty()) {
             Alert alert = new Alert(Alert.AlertType.INFORMATION);
-            alert.setTitle("Print Schedule");
+            alert.setTitle("Export Schedule");
             alert.setHeaderText(null);
-            alert.setContentText("There is no schedule to print. Generate a schedule first.");
+            alert.setContentText("There is no schedule to export. Generate a schedule first.");
             alert.showAndWait();
             return;
         }
 
-        PrinterJob job = PrinterJob.createPrinterJob();
-        if (job == null) {
+        FileChooser fileChooser = new FileChooser();
+        fileChooser.setTitle("Export Schedule to CSV");
+        fileChooser.setInitialFileName("schedule_" + java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss")) + ".csv");
+        fileChooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("CSV Files", "*.csv"));
+
+        java.io.File file = fileChooser.showSaveDialog(root.getScene().getWindow());
+        if (file == null) {
+            return; // User cancelled
+        }
+
+        try (java.io.PrintWriter writer = new java.io.PrintWriter(file, java.nio.charset.StandardCharsets.UTF_8)) {
+            // Write header
+            writer.println("Course,Room,Date,Start Time,End Time,Duration (min),Students");
+
+            // Write data rows
+            for (ExamSession session : scheduleTable.getItems()) {
+                String course = "N/A";
+                if (session.getExam() != null && session.getExam().getCourse() != null) {
+                    course = session.getExam().getCourse().getCourseCode();
+                    if (course == null || course.isBlank()) {
+                        course = "N/A";
+                    }
+                }
+
+                String room = "N/A";
+                if (session.getRoom() != null) {
+                    // Prefer roomName, fallback to roomId
+                    String roomName = session.getRoom().getRoomName();
+                    if (roomName != null && !roomName.isBlank()) {
+                        room = roomName;
+                    } else {
+                        String roomId = session.getRoom().getRoomId();
+                        if (roomId != null && !roomId.isBlank()) {
+                            room = roomId;
+                        }
+                    }
+                }
+
+                String date = session.getTimeSlot() != null ? session.getTimeSlot().getDate().toString() : "N/A";
+                String startTime = session.getTimeSlot() != null ? session.getTimeSlot().getStartTime().toString() : "N/A";
+                String endTime = session.getActualEndTime() != null ? session.getActualEndTime().toString() : "N/A";
+                int duration = session.getExam() != null ? session.getExam().getDurationMinutes() : 0;
+                int students = session.getAssignedStudents().size();
+
+                writer.printf("%s,%s,%s,%s,%s,%d,%d%n",
+                    escapeCsv(course),
+                    escapeCsv(room),
+                    date,
+                    startTime,
+                    endTime,
+                    duration,
+                    students);
+            }
+
+            Alert alert = new Alert(Alert.AlertType.INFORMATION);
+            alert.setTitle("Export Successful");
+            alert.setHeaderText(null);
+            alert.setContentText("Schedule exported successfully to:\n" + file.getAbsolutePath());
+            alert.showAndWait();
+
+        } catch (java.io.IOException ex) {
             Alert alert = new Alert(Alert.AlertType.ERROR);
-            alert.setTitle("Print Schedule");
+            alert.setTitle("Export Failed");
             alert.setHeaderText(null);
-            alert.setContentText("No printer is available.");
-            alert.showAndWait();
-            return;
-        }
-
-        boolean proceed = job.showPrintDialog(root.getScene().getWindow());
-        if (!proceed) {
-            return;
-        }
-
-        boolean success = job.printPage(scheduleTable);
-        if (success) {
-            job.endJob();
-        } else {
-            Alert alert = new Alert(Alert.AlertType.ERROR);
-            alert.setTitle("Print Schedule");
-            alert.setHeaderText(null);
-            alert.setContentText("Failed to print the schedule.");
+            alert.setContentText("Failed to export schedule: " + ex.getMessage());
             alert.showAndWait();
         }
+    }
+
+    private String escapeCsv(String value) {
+        if (value == null) return "";
+        if (value.contains(",") || value.contains("\"") || value.contains("\n")) {
+            return "\"" + value.replace("\"", "\"\"") + "\"";
+        }
+        return value;
     }
 
     private void showSessionStudents(ExamSession session) {

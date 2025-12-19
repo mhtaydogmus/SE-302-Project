@@ -46,9 +46,6 @@ public class StudentManagementView {
         this.rooms = rooms;
         this.courseList = new ListView<>(courses);
         this.roomList = new ListView<>(rooms);
-        // Sample Data
-        students.add(new Student("101", "Ali", "Veli", "ali@mail.com", "Male"));
-        students.add(new Student("102", "Ayşe", "Fatma", "ayse@mail.com", "Female"));
 
         root.setPadding(new Insets(10));
 

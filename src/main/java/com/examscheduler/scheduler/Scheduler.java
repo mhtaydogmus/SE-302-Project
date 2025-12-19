@@ -43,7 +43,18 @@ public class Scheduler {
         this.customConstraints = customConstraints != null ? new ArrayList<>(customConstraints) : new ArrayList<>();
     }
 
-    public Schedule generateSchedule(List<Course> courses, List<Exam> ignoredExams) {
+    public Schedule generateSchedule(List<Course> courses, List<Exam> exams) {
+        // DEBUG: Print scheduler configuration
+        System.out.println("=== SCHEDULER DEBUG ===");
+        System.out.println("Available rooms: " + (availableRooms != null ? availableRooms.size() : 0));
+        if (availableRooms != null) {
+            for (Room r : availableRooms) {
+                System.out.println("  - Room: " + r.getRoomId() + " (" + r.getRoomName() + "), Capacity: " + r.getCapacity());
+            }
+        }
+        System.out.println("Available time slots: " + (availableTimeSlots != null ? availableTimeSlots.size() : 0));
+        System.out.println("======================");
+
         Schedule schedule = new Schedule(
             UUID.randomUUID().toString(),
             "Generated Exam Schedule",
@@ -60,7 +71,13 @@ public class Scheduler {
         }
 
         List<Exam> examsToSchedule = new ArrayList<>();
-        if (courses != null) {
+
+        // Use imported exams if provided, otherwise create from courses
+        if (exams != null && !exams.isEmpty()) {
+            examsToSchedule.addAll(exams);
+            System.out.println("DEBUG: Using " + exams.size() + " imported exams");
+        } else if (courses != null) {
+            // Fallback: create exams from courses (for backward compatibility)
             for (Course course : courses) {
                 if (course == null) continue;
                 String examId = course.getCourseCode() != null && !course.getCourseCode().isBlank()
@@ -69,6 +86,7 @@ public class Scheduler {
                 int duration = course.getExamDurationMinutes() > 0 ? course.getExamDurationMinutes() : 120;
                 examsToSchedule.add(new Exam(examId, course, "Course Exam", duration));
             }
+            System.out.println("DEBUG: Created " + examsToSchedule.size() + " exams from courses");
         }
 
         // Prioritization: Sort exams by number of students in descending order
@@ -102,6 +120,7 @@ public class Scheduler {
     }
 
     private List<ExamSession> findAndCreateExamSessions(Exam exam, List<Student> students, Schedule schedule) {
+        System.out.println("\nDEBUG: Scheduling exam " + exam.getExamId() + " for " + students.size() + " students");
         Map<String, Integer> failureReasons = new HashMap<>();
 
         for (TimeSlot timeSlot : availableTimeSlots) {
@@ -133,12 +152,14 @@ public class Scheduler {
             }
 
             // Step 2: Find available rooms for this time slot.
+            System.out.println("  Checking time slot: " + timeSlot.getDate() + " " + timeSlot.getStartTime());
             List<Room> availableRoomsForSlot = new ArrayList<>();
             for (Room room : this.availableRooms) {
                 if (isRoomAvailable(room, timeSlot, new ArrayList<>(), schedule)) {
                     availableRoomsForSlot.add(room);
                 }
             }
+            System.out.println("  Available rooms for this slot: " + availableRoomsForSlot.size());
 
             // Step 3: Try to find a single room that fits.
             List<Room> roomsThatFit = new ArrayList<>();
@@ -147,6 +168,7 @@ public class Scheduler {
                     roomsThatFit.add(room);
                 }
             }
+            System.out.println("  Rooms that fit " + students.size() + " students: " + roomsThatFit.size());
 
             if (!roomsThatFit.isEmpty()) {
                 // Shuffle the list of suitable rooms to avoid 'first-fit' bias.
@@ -155,6 +177,7 @@ public class Scheduler {
 
                 String sessionId = exam.getExamId() + "-S1";
                 ExamSession session = new ExamSession(sessionId, exam, timeSlot, selectedRoom);
+                System.out.println("  ✓ ASSIGNED to room: " + selectedRoom.getRoomId() + " (" + selectedRoom.getRoomName() + ")");
                 for (Student student : students) {
                     session.assignStudent(student);
                     student.assignExamSession(session);
@@ -191,9 +214,10 @@ public class Scheduler {
                 failureReasons.merge("INSUFFICIENT_CAPACITY", 1, Integer::sum);
             }
         }
-        
+
         // If loop finishes, scheduling failed for this exam. Log detailed reason.
         String reason = "Could not find a suitable time/room for exam " + exam.getExamId() + ". Failures: " + failureReasons;
+        System.out.println("  ✗ FAILED: " + reason);
         schedule.addSchedulingNote(reason);
         return new ArrayList<>();
     }

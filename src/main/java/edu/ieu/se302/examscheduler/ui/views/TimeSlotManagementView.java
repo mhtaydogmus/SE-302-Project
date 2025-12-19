@@ -23,11 +23,6 @@ public class TimeSlotManagementView {
     private final ListView<TimeSlot> timeSlotList = new ListView<>(timeSlots);
 
     public TimeSlotManagementView() {
-        // Sample Data
-        timeSlots.add(new TimeSlot(LocalDate.now(), LocalTime.of(9, 0), LocalTime.of(11, 0)));
-        timeSlots.add(new TimeSlot(LocalDate.now(), LocalTime.of(13, 0), LocalTime.of(15, 0)));
-
-
         root.setPadding(new Insets(10));
 
         Label title = new Label("Time Slot Management");

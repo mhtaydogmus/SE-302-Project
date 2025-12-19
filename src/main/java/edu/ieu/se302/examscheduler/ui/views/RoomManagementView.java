@@ -32,9 +32,6 @@ public class RoomManagementView {
 
     public RoomManagementView(ObservableList<ExamSession> scheduleSessions) {
         this.scheduleSessions = scheduleSessions;
-        // Sample Data
-        rooms.add(new Room("R101", "Room 101", 30));
-        rooms.add(new Room("R102", "Room 102", 25));
 
         root.setPadding(new Insets(10));
 
@@ -170,7 +167,8 @@ public class RoomManagementView {
             nameField.setText(room.getRoomName());
         }
 
-        Spinner<Integer> capacitySpinner = new Spinner<>(1, 100, 30);
+        Spinner<Integer> capacitySpinner = new Spinner<>(1, 10000, 30);
+        capacitySpinner.setEditable(true);
         if (room != null) {
             capacitySpinner.getValueFactory().setValue(room.getCapacity());
         }
