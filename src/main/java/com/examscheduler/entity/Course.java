@@ -9,9 +9,11 @@ public class Course {
     private String courseName;
     private String courseCode;
     private int credits;
+    private int examDurationMinutes;
     private List<Enrollment> enrollments;
 
     public Course() {
+        this.examDurationMinutes = 0;
         this.enrollments = new ArrayList<>();
     }
 
@@ -20,6 +22,7 @@ public class Course {
         this.courseName = courseName;
         this.courseCode = courseCode;
         this.credits = credits;
+        this.examDurationMinutes = 0;
         this.enrollments = new ArrayList<>();
     }
 
@@ -75,6 +78,14 @@ public class Course {
 
     public void setCredits(int credits) {
         this.credits = credits;
+    }
+
+    public int getExamDurationMinutes() {
+        return examDurationMinutes;
+    }
+
+    public void setExamDurationMinutes(int examDurationMinutes) {
+        this.examDurationMinutes = examDurationMinutes;
     }
 
     public List<Enrollment> getEnrollments() {

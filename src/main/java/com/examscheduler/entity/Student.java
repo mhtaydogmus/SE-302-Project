@@ -10,6 +10,7 @@ public class Student {
     private String firstName;
     private String lastName;
     private String email;
+    private String gender;
     private List<Enrollment> enrollments;
     private List<ExamSession> assignedSessions;
 
@@ -18,14 +19,20 @@ public class Student {
         this.assignedSessions = new ArrayList<>();
     }
 
-    public Student(String studentId, String firstName, String lastName, String email) {
+    public Student(String studentId, String firstName, String lastName, String email, String gender) {
         this.studentId = studentId;
         this.firstName = firstName;
         this.lastName = lastName;
         this.email = email;
+        this.gender = gender;
         this.enrollments = new ArrayList<>();
         this.assignedSessions = new ArrayList<>();
     }
+    
+    public Student(String studentId, String firstName, String lastName, String email) {
+        this(studentId, firstName, lastName, email, "Not specified");
+    }
+
 
     public int getDailyExamCount(LocalDate date) {
         if (date == null) {
@@ -85,7 +92,16 @@ public class Student {
     }
 
     public String getFullName() {
-        return firstName + " " + lastName;
+        boolean firstNameInvalid = (firstName == null || firstName.isBlank());
+        boolean lastNameInvalid = (lastName == null || lastName.isBlank());
+        if (firstNameInvalid && lastNameInvalid) {
+            return "Student [" + studentId + "]";
+        }
+        
+        String fName = firstNameInvalid ? "" : firstName.trim();
+        String lName = lastNameInvalid ? "" : lastName.trim();
+
+        return (fName + " " + lName).trim();
     }
 
     public String getStudentId() {
@@ -119,6 +135,15 @@ public class Student {
     public void setEmail(String email) {
         this.email = email;
     }
+
+    public String getGender() {
+        return gender;
+    }
+
+    public void setGender(String gender) {
+        this.gender = gender;
+    }
+
 
     public List<Enrollment> getEnrollments() {
         return new ArrayList<>(enrollments);
@@ -155,6 +180,7 @@ public class Student {
                 "studentId='" + studentId + '\'' +
                 ", fullName='" + getFullName() + '\'' +
                 ", email='" + email + '\'' +
+                ", gender='" + gender + '\'' +
                 ", enrollmentCount=" + enrollments.size() +
                 ", assignedSessionCount=" + assignedSessions.size() +
                 '}';

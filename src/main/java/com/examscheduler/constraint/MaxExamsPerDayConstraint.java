@@ -8,7 +8,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
-public class MaxExamsPerDayConstraint implements Constraint {
+public class MaxExamsPerDayConstraint extends Constraint {
     private int maxExamsPerDay;
 
     public MaxExamsPerDayConstraint() {
@@ -52,16 +52,6 @@ public class MaxExamsPerDayConstraint implements Constraint {
         return violations;
     }
 
-    @Override
-    public String getName() {
-        return "Max Exams Per Day Constraint";
-    }
-
-    @Override
-    public String getDescription() {
-        return String.format("Limits students to a maximum of %d exams per day", maxExamsPerDay);
-    }
-
     public int getMaxExamsPerDay() {
         return maxExamsPerDay;
     }
@@ -73,9 +63,7 @@ public class MaxExamsPerDayConstraint implements Constraint {
     @Override
     public String toString() {
         return "MaxExamsPerDayConstraint{" +
-                "name='" + getName() + '\'' +
                 ", maxExamsPerDay=" + maxExamsPerDay +
-                ", description='" + getDescription() + '\'' +
                 '}';
     }
 }
