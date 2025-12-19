@@ -4,48 +4,73 @@ import java.time.LocalDateTime;
 import java.util.Objects;
 
 public class Enrollment {
-    private String enrollmentId;
+    private int enrollmentId;                    // String → int yapıldı
     private Student student;
     private Course course;
     private LocalDateTime enrollmentDate;
-    private String status;
+    private EnrollmentStatus status;             // String → Enum
 
-    public Enrollment() {
+    // Enum tanımı (iç sınıfta veya ayrı dosyada olabilir)
+    public enum EnrollmentStatus {
+        ACTIVE, DROPPED, COMPLETED
     }
 
-    public Enrollment(String enrollmentId, Student student, Course course) {
+    public Enrollment() {
+        this.enrollmentDate = LocalDateTime.now();
+        this.status = EnrollmentStatus.ACTIVE;
+    }
+
+    public Enrollment(int enrollmentId, Student student, Course course) {
         this.enrollmentId = enrollmentId;
         this.student = student;
         this.course = course;
         this.enrollmentDate = LocalDateTime.now();
-        this.status = "ACTIVE";
+        this.status = EnrollmentStatus.ACTIVE;
+
+        // Bidirectional ilişkiyi otomatik kur (eğer nesneler null değilse)
+        linkStudentAndCourse();
     }
 
-    public Enrollment(String enrollmentId, Student student, Course course, LocalDateTime enrollmentDate, String status) {
+    public Enrollment(int enrollmentId, Student student, Course course, LocalDateTime enrollmentDate, EnrollmentStatus status) {
         this.enrollmentId = enrollmentId;
         this.student = student;
         this.course = course;
         this.enrollmentDate = enrollmentDate;
-        this.status = status;
+        this.status = status != null ? status : EnrollmentStatus.ACTIVE;
+
+        linkStudentAndCourse();
+    }
+
+    /**
+     * Student ve Course ile bidirectional ilişkiyi kurar
+     */
+    private void linkStudentAndCourse() {
+        if (student != null) {
+            student.addEnrollment(this);
+        }
+        if (course != null) {
+            course.addEnrollment(this);
+        }
     }
 
     public boolean isActive() {
-        return "ACTIVE".equals(status);
+        return status == EnrollmentStatus.ACTIVE;
     }
 
     public void drop() {
-        this.status = "DROPPED";
+        this.status = EnrollmentStatus.DROPPED;
     }
 
     public void complete() {
-        this.status = "COMPLETED";
+        this.status = EnrollmentStatus.COMPLETED;
     }
 
-    public String getEnrollmentId() {
+    // Getter & Setter
+    public int getEnrollmentId() {
         return enrollmentId;
     }
 
-    public void setEnrollmentId(String enrollmentId) {
+    public void setEnrollmentId(int enrollmentId) {
         this.enrollmentId = enrollmentId;
     }
 
@@ -73,12 +98,12 @@ public class Enrollment {
         this.enrollmentDate = enrollmentDate;
     }
 
-    public String getStatus() {
+    public EnrollmentStatus getStatus() {
         return status;
     }
 
-    public void setStatus(String status) {
-        this.status = status;
+    public void setStatus(EnrollmentStatus status) {
+        this.status = status != null ? status : EnrollmentStatus.ACTIVE;
     }
 
     @Override
@@ -86,7 +111,7 @@ public class Enrollment {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         Enrollment that = (Enrollment) o;
-        return Objects.equals(enrollmentId, that.enrollmentId);
+        return enrollmentId == that.enrollmentId;
     }
 
     @Override
@@ -96,12 +121,14 @@ public class Enrollment {
 
     @Override
     public String toString() {
+        String studentId = student != null ? String.valueOf(student.getStudentId()) : "null";
+        String courseCode = course != null ? course.getCourseCode() : "null";
         return "Enrollment{" +
-                "enrollmentId='" + enrollmentId + '\'' +
-                ", student=" + (student != null ? student.getStudentId() : "null") +
-                ", course=" + (course != null ? course.getCourseCode() : "null") +
+                "enrollmentId=" + enrollmentId +
+                ", studentId=" + studentId +
+                ", courseCode='" + courseCode + '\'' +
                 ", enrollmentDate=" + enrollmentDate +
-                ", status='" + status + '\'' +
+                ", status=" + status +
                 '}';
     }
 }

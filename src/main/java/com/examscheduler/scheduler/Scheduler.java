@@ -1,203 +1,184 @@
 package com.examscheduler.scheduler;
 
+import com.examscheduler.constraint.Constraint;
 import com.examscheduler.constraint.MaxExamsPerDayConstraint;
 import com.examscheduler.constraint.NoOverlapConstraint;
 import com.examscheduler.entity.*;
 
-import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
-import java.util.UUID;
+import java.util.stream.Collectors;
 
 public class Scheduler {
     private List<Room> availableRooms;
     private List<TimeSlot> availableTimeSlots;
-    private int maxExamsPerDay;
+    private int maxExamsPerDay = 2;
+
+    private int nextSessionId = 1; // Otomatik artan session ID için
+
+    // Constraint'ları Scheduler içinde tutuyoruz (Design Document'a uygun)
+    private final List<Constraint> constraints;
 
     public Scheduler() {
         this.availableRooms = new ArrayList<>();
         this.availableTimeSlots = new ArrayList<>();
-        this.maxExamsPerDay = 2;
+        this.constraints = new ArrayList<>();
+
+        // Varsayılan constraint'ları ekle (dökümanda Scheduler'ın constraint kullandığı belirtiliyor)
+        this.constraints.add(new NoOverlapConstraint());
+        this.constraints.add(new MaxExamsPerDayConstraint(maxExamsPerDay));
     }
 
-    public Scheduler(List<Room> availableRooms, List<TimeSlot> availableTimeSlots, int maxExamsPerDay) {
-        this.availableRooms = availableRooms != null ? new ArrayList<>(availableRooms) : new ArrayList<>();
-        this.availableTimeSlots = availableTimeSlots != null ? new ArrayList<>(availableTimeSlots) : new ArrayList<>();
-        this.maxExamsPerDay = maxExamsPerDay;
+    public void setAvailableRooms(List<Room> rooms) {
+        this.availableRooms = new ArrayList<>(rooms);
     }
 
+    public void setAvailableTimeSlots(List<TimeSlot> slots) {
+        this.availableTimeSlots = new ArrayList<>(slots);
+    }
+
+    public void setMaxExamsPerDay(int max) {
+        if (max > 0) {
+            this.maxExamsPerDay = max;
+            // MaxExamsPerDayConstraint varsa güncelle
+            constraints.stream()
+                    .filter(c -> c instanceof MaxExamsPerDayConstraint)
+                    .map(c -> (MaxExamsPerDayConstraint) c)
+                    .forEach(c -> c.setMaxExamsPerDay(max));
+        }
+    }
+
+    /**
+     * Schedule üretir ve tüm constraint'ları kullanarak validation yapar
+     */
     public Schedule generateSchedule(List<Course> courses, List<Exam> exams) {
-        Schedule schedule = new Schedule(
-            UUID.randomUUID().toString(),
-            "Generated Exam Schedule",
-            LocalDate.now(),
-            LocalDate.now().plusMonths(1)
-        );
+        Schedule schedule = new Schedule(); // Artık sadece examSessions tutuyor
 
-        schedule.addConstraint(new NoOverlapConstraint());
-        schedule.addConstraint(new MaxExamsPerDayConstraint(maxExamsPerDay));
+        // En çok öğrencisi olan exam'leri önce yerleştir (dökümana uygun)
+        List<Exam> sortedExams = exams.stream()
+                .sorted(Comparator.comparingInt(e -> -e.getEnrolledStudents().size()))
+                .collect(Collectors.toList());
 
-        for (Exam exam : exams) {
-            List<Student> enrolledStudents = exam.getEnrolledStudents();
+        for (Exam exam : sortedExams) {
+            List<Student> enrolled = new ArrayList<>(exam.getEnrolledStudents());
+            if (enrolled.isEmpty()) continue;
 
-            if (enrolledStudents.isEmpty()) {
-                continue;
-            }
-
-            List<ExamSession> sessions = createExamSessions(exam, enrolledStudents, schedule);
-
+            List<ExamSession> sessions = assignStudentsToSessions(exam, enrolled, schedule);
             for (ExamSession session : sessions) {
                 exam.addExamSession(session);
                 schedule.addExamSession(session);
             }
         }
 
-        List<String> violations = schedule.validate();
-
-        if (!violations.isEmpty()) {
-            attemptToResolveViolations(schedule, violations);
-        }
-
+        // Validation artık Scheduler'da yapılıyor
         return schedule;
     }
 
+    /**
+     * Schedule'ı tüm constraint'lara göre doğrular ve ihlalleri döner
+     * Design Document 5.5.4'e uygun
+     */
+    public List<String> validateSchedule(Schedule schedule) {
+        List<String> violations = new ArrayList<>();
 
-    private List<ExamSession> createExamSessions(Exam exam, List<Student> students, Schedule schedule) {
+        for (Constraint constraint : constraints) {
+            violations.addAll(constraint.validate(schedule));
+        }
+
+        return violations;
+    }
+
+    private List<ExamSession> assignStudentsToSessions(Exam exam, List<Student> students, Schedule schedule) {
         List<ExamSession> sessions = new ArrayList<>();
-        List<Student> remainingStudents = new ArrayList<>(students);
+        List<Student> remaining = new ArrayList<>(students);
 
-        int sessionIndex = 0;
+        int attempts = 0;
+        final int MAX_ATTEMPTS = availableTimeSlots.size() * 2;
 
-        while (!remainingStudents.isEmpty()) {
-            TimeSlot selectedTimeSlot = selectTimeSlot(remainingStudents, schedule);
-            Room selectedRoom = selectRoom(remainingStudents);
+        while (!remaining.isEmpty() && attempts < MAX_ATTEMPTS) {
+            attempts++;
 
-            if (selectedTimeSlot == null || selectedRoom == null) {
-                System.err.println("WARNING: Could not schedule all students for exam " + exam.getExamId());
+            TimeSlot bestSlot = findBestTimeSlot(remaining);
+            if (bestSlot == null) {
+                System.out.println("UYARI: " + exam.getName() + " için uygun time slot bulunamadı. Kalan: " + remaining.size());
                 break;
             }
 
-            String sessionId = exam.getExamId() + "-S" + (++sessionIndex);
-            ExamSession session = new ExamSession(sessionId, exam, selectedTimeSlot, selectedRoom);
+            int requiredCapacity = Math.min(remaining.size(), getMaxRoomCapacity());
+            Room bestRoom = findBestRoom(requiredCapacity);
 
-            List<Student> studentsToAssign = new ArrayList<>();
-            for (Student student : new ArrayList<>(remainingStudents)) {
-                if (!student.hasExamOverlap(session)) {
-                    studentsToAssign.add(student);
-                    if (studentsToAssign.size() >= selectedRoom.getCapacity()) {
-                        break;
-                    }
+            if (bestRoom == null || bestRoom.getCapacity() < 1) {
+                System.out.println("UYARI: Uygun oda bulunamadı için " + exam.getName());
+                break;
+            }
+
+            ExamSession session = new ExamSession(
+                    nextSessionId++,
+                    exam,
+                    bestSlot,
+                    bestRoom
+            );
+
+            List<Student> assignable = new ArrayList<>();
+            for (Student s : remaining) {
+                if (!s.hasExamOverlap(session) &&
+                        s.getDailyExamCount(bestSlot.getDate()) < maxExamsPerDay) {
+                    assignable.add(s);
+                    if (assignable.size() >= bestRoom.getCapacity()) break;
                 }
             }
 
-            if (studentsToAssign.isEmpty()) {
-                System.err.println("WARNING: No students could be assigned to a new session for exam " +
-                                   exam.getExamId() + " (likely due to conflicts)");
-                break;
+            if (assignable.isEmpty()) {
+                continue;
             }
 
-            for (Student student : studentsToAssign) {
-                session.assignStudent(student);
-                student.assignExamSession(session);
-                remainingStudents.remove(student);
+            for (Student s : assignable) {
+                session.assignStudent(s);
+                remaining.remove(s);
             }
 
             sessions.add(session);
         }
 
+        if (!remaining.isEmpty()) {
+            System.out.println("HATA: " + exam.getName() + " sınavı için " + remaining.size() +
+                    " öğrenci yerleştirilemedi!");
+        }
+
         return sessions;
     }
 
-    private TimeSlot selectTimeSlot(List<Student> students, Schedule schedule) {
-        for (TimeSlot timeSlot : availableTimeSlots) {
-            boolean suitableForMost = true;
-
-            int conflictCount = 0;
-            for (Student student : students) {
-                if (student.getDailyExamCount(timeSlot.getDate()) >= maxExamsPerDay) {
-                    conflictCount++;
-                }
-            }
-
-            if (conflictCount < students.size() * 0.2) {
-                return new TimeSlot(timeSlot.getDate(), timeSlot.getStartTime(), timeSlot.getEndTime());
-            }
-        }
-
-        if (!availableTimeSlots.isEmpty()) {
-            TimeSlot ts = availableTimeSlots.get(0);
-            return new TimeSlot(ts.getDate(), ts.getStartTime(), ts.getEndTime());
-        }
-
-        return null;
+    private TimeSlot findBestTimeSlot(List<Student> students) {
+        return availableTimeSlots.stream()
+                .min(Comparator.comparingInt(slot -> {
+                    int conflictCount = 0;
+                    for (Student s : students) {
+                        if (s.hasExamOverlap(new ExamSession(0, null, slot, null)) ||
+                                s.getDailyExamCount(slot.getDate()) >= maxExamsPerDay) {
+                            conflictCount++;
+                        }
+                    }
+                    return conflictCount;
+                }))
+                .orElse(null);
     }
 
-
-    private Room selectRoom(List<Student> students) {
-        int requiredCapacity = students.size();
-
-        Room bestRoom = null;
-        for (Room room : availableRooms) {
-            if (room.getCapacity() >= requiredCapacity) {
-                if (bestRoom == null || room.getCapacity() < bestRoom.getCapacity()) {
-                    bestRoom = room;
-                }
-            }
-        }
-
-        if (bestRoom == null && !availableRooms.isEmpty()) {
-            bestRoom = availableRooms.get(0);
-            for (Room room : availableRooms) {
-                if (room.getCapacity() > bestRoom.getCapacity()) {
-                    bestRoom = room;
-                }
-            }
-        }
-
-        return bestRoom;
+    private Room findBestRoom(int minRequiredCapacity) {
+        return availableRooms.stream()
+                .filter(r -> r.getCapacity() >= minRequiredCapacity)
+                .min(Comparator.comparingInt(Room::getCapacity))
+                .orElseGet(() ->
+                        availableRooms.stream()
+                                .max(Comparator.comparingInt(Room::getCapacity))
+                                .orElse(null)
+                );
     }
 
-
-    private void attemptToResolveViolations(Schedule schedule, List<String> violations) {
-        System.err.println("Schedule has " + violations.size() + " violations:");
-        for (String violation : violations) {
-            System.err.println("  - " + violation);
-        }
-    }
-
-    public List<Room> getAvailableRooms() {
-        return new ArrayList<>(availableRooms);
-    }
-
-    public void setAvailableRooms(List<Room> availableRooms) {
-        this.availableRooms = availableRooms != null ? new ArrayList<>(availableRooms) : new ArrayList<>();
-    }
-
-    public void addRoom(Room room) {
-        if (room != null && !availableRooms.contains(room)) {
-            availableRooms.add(room);
-        }
-    }
-
-    public List<TimeSlot> getAvailableTimeSlots() {
-        return new ArrayList<>(availableTimeSlots);
-    }
-
-    public void setAvailableTimeSlots(List<TimeSlot> availableTimeSlots) {
-        this.availableTimeSlots = availableTimeSlots != null ? new ArrayList<>(availableTimeSlots) : new ArrayList<>();
-    }
-
-    public void addTimeSlot(TimeSlot timeSlot) {
-        if (timeSlot != null && !availableTimeSlots.contains(timeSlot)) {
-            availableTimeSlots.add(timeSlot);
-        }
-    }
-
-    public int getMaxExamsPerDay() {
-        return maxExamsPerDay;
-    }
-
-    public void setMaxExamsPerDay(int maxExamsPerDay) {
-        this.maxExamsPerDay = maxExamsPerDay;
+    private int getMaxRoomCapacity() {
+        return availableRooms.stream()
+                .mapToInt(Room::getCapacity)
+                .max()
+                .orElse(0);
     }
 }

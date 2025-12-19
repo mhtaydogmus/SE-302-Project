@@ -1,12 +1,10 @@
 package com.examscheduler.entity;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 
 public class Student {
-    private String studentId;
+    private int studentId;
     private String firstName;
     private String lastName;
     private String email;
@@ -18,7 +16,7 @@ public class Student {
         this.assignedSessions = new ArrayList<>();
     }
 
-    public Student(String studentId, String firstName, String lastName, String email) {
+    public Student(int studentId, String firstName, String lastName, String email) {
         this.studentId = studentId;
         this.firstName = firstName;
         this.lastName = lastName;
@@ -34,8 +32,7 @@ public class Student {
 
         int count = 0;
         for (ExamSession session : assignedSessions) {
-            if (session.getTimeSlot() != null &&
-                date.equals(session.getTimeSlot().getDate())) {
+            if (session.getTimeSlot() != null && date.equals(session.getTimeSlot().getDate())) {
                 count++;
             }
         }
@@ -49,7 +46,7 @@ public class Student {
 
         for (ExamSession existingSession : assignedSessions) {
             if (existingSession.getTimeSlot() != null &&
-                existingSession.getTimeSlot().overlaps(session.getTimeSlot())) {
+                    existingSession.getTimeSlot().overlaps(session.getTimeSlot())) {
                 return true;
             }
         }
@@ -63,7 +60,9 @@ public class Student {
     }
 
     public void removeEnrollment(Enrollment enrollment) {
-        enrollments.remove(enrollment);
+        if (enrollment != null) {
+            enrollments.remove(enrollment);
+        }
     }
 
     public void assignExamSession(ExamSession session) {
@@ -73,13 +72,17 @@ public class Student {
     }
 
     public void removeExamSession(ExamSession session) {
-        assignedSessions.remove(session);
+        if (session != null) {
+            assignedSessions.remove(session);
+        }
     }
 
     public List<Course> getEnrolledCourses() {
         List<Course> courses = new ArrayList<>();
         for (Enrollment enrollment : enrollments) {
-            courses.add(enrollment.getCourse());
+            if (enrollment != null && enrollment.getCourse() != null) {  // null kontrolü eklendi
+                courses.add(enrollment.getCourse());
+            }
         }
         return courses;
     }
@@ -88,11 +91,12 @@ public class Student {
         return firstName + " " + lastName;
     }
 
-    public String getStudentId() {
+    // Getter & Setter
+    public int getStudentId() {
         return studentId;
     }
 
-    public void setStudentId(String studentId) {
+    public void setStudentId(int studentId) {
         this.studentId = studentId;
     }
 
@@ -141,7 +145,7 @@ public class Student {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         Student student = (Student) o;
-        return Objects.equals(studentId, student.studentId);
+        return studentId == student.studentId;
     }
 
     @Override
@@ -152,7 +156,7 @@ public class Student {
     @Override
     public String toString() {
         return "Student{" +
-                "studentId='" + studentId + '\'' +
+                "studentId=" + studentId +
                 ", fullName='" + getFullName() + '\'' +
                 ", email='" + email + '\'' +
                 ", enrollmentCount=" + enrollments.size() +

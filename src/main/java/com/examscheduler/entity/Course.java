@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.Objects;
 
 public class Course {
-    private String courseId;
+    private int courseId;                    // String → int yapıldı (belgeye uygun)
     private String courseName;
     private String courseCode;
     private int credits;
@@ -15,7 +15,7 @@ public class Course {
         this.enrollments = new ArrayList<>();
     }
 
-    public Course(String courseId, String courseName, String courseCode, int credits) {
+    public Course(int courseId, String courseName, String courseCode, int credits) {
         this.courseId = courseId;
         this.courseName = courseName;
         this.courseCode = courseCode;
@@ -30,13 +30,17 @@ public class Course {
     }
 
     public void removeEnrollment(Enrollment enrollment) {
-        enrollments.remove(enrollment);
+        if (enrollment != null) {
+            enrollments.remove(enrollment);
+        }
     }
 
     public List<Student> getEnrolledStudents() {
         List<Student> students = new ArrayList<>();
         for (Enrollment enrollment : enrollments) {
-            students.add(enrollment.getStudent());
+            if (enrollment != null && enrollment.getStudent() != null) {  // null kontrolü eklendi
+                students.add(enrollment.getStudent());
+            }
         }
         return students;
     }
@@ -45,11 +49,12 @@ public class Course {
         return enrollments.size();
     }
 
-    public String getCourseId() {
+    // Getter & Setter
+    public int getCourseId() {
         return courseId;
     }
 
-    public void setCourseId(String courseId) {
+    public void setCourseId(int courseId) {
         this.courseId = courseId;
     }
 
@@ -90,7 +95,7 @@ public class Course {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         Course course = (Course) o;
-        return Objects.equals(courseId, course.courseId);
+        return courseId == course.courseId;
     }
 
     @Override
@@ -101,7 +106,7 @@ public class Course {
     @Override
     public String toString() {
         return "Course{" +
-                "courseId='" + courseId + '\'' +
+                "courseId=" + courseId +
                 ", courseName='" + courseName + '\'' +
                 ", courseCode='" + courseCode + '\'' +
                 ", credits=" + credits +

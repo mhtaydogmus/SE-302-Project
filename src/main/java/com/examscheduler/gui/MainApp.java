@@ -6,15 +6,29 @@ import javafx.stage.Stage;
 
 public class MainApp extends Application {
 
-    @Override
-    public void start(Stage stage) {
-        MainView view = new MainView();
-        Scene scene = new Scene(view, 900, 600);
+    private static MainView mainView;
 
-        stage.setTitle("Exam Scheduling System");
-        stage.setScene(scene);
-        stage.show();
+    @Override
+    public void start(Stage primaryStage) {
+        mainView = new MainView();
+        Scene scene = new Scene(mainView, 1200, 800);
+
+        mainView.setStage(primaryStage);
+
+        primaryStage.setTitle("Exam Scheduling System");
+        primaryStage.setScene(scene);
+        primaryStage.show();
+
+        // runAutomatedTest();   ← bunu sil veya yorum yap
     }
+
+    public static void refreshTables() {
+        if (mainView != null) {
+            mainView.refreshTables();
+        }
+    }
+
+    // runAutomatedTest metodunu tamamen kaldır (veya yorum satırına al)
 
     public static void main(String[] args) {
         launch(args);

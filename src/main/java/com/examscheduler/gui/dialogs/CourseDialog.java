@@ -16,51 +16,74 @@ public class CourseDialog extends Stage {
         initModality(Modality.APPLICATION_MODAL);
 
         TextField idField = new TextField();
+        idField.setPromptText("e.g. 501");
         TextField codeField = new TextField();
         TextField nameField = new TextField();
         TextField creditsField = new TextField();
 
         if (course != null) {
-            idField.setText(course.getCourseId());
+            // Course artık int courseId kullanıyor
+            idField.setText(String.valueOf(course.getCourseId()));
             codeField.setText(course.getCourseCode());
             nameField.setText(course.getCourseName());
             creditsField.setText(String.valueOf(course.getCredits()));
+
             idField.setDisable(true); // ID değiştirilemez
         }
 
         Button save = new Button("Save");
         save.setOnAction(e -> {
-            if (idField.getText().isBlank() || codeField.getText().isBlank() || nameField.getText().isBlank() || creditsField.getText().isBlank()) {
+            String idStr = idField.getText().trim();
+            String code = codeField.getText().trim();
+            String name = nameField.getText().trim();
+            String creditsStr = creditsField.getText().trim();
+
+            if (idStr.isEmpty() || code.isEmpty() || name.isEmpty() || creditsStr.isEmpty()) {
                 alert("All fields are required!");
                 return;
             }
 
+            int courseId;
+            int credits;
+
+            // ID'yi int'e çevir
             try {
-                Integer.parseInt(creditsField.getText());
+                courseId = Integer.parseInt(idStr);
             } catch (NumberFormatException ex) {
-                alert("Credits must be a number!");
+                alert("Course ID must be a valid number!");
                 return;
             }
 
-            boolean idExists = DataStore.courses.stream().anyMatch(c -> c.getCourseId().equals(idField.getText()));
-            if (course == null && idExists) {
+            // Credits'i int'e çevir
+            try {
+                credits = Integer.parseInt(creditsStr);
+                if (credits <= 0) {
+                    alert("Credits must be a positive number!");
+                    return;
+                }
+            } catch (NumberFormatException ex) {
+                alert("Credits must be a valid number!");
+                return;
+            }
+
+            // Yeni eklemede duplicate ID kontrolü
+            if (course == null && DataStore.getCourses().stream()
+                    .anyMatch(c -> c.getCourseId() == courseId)) {
                 alert("Course ID already exists!");
                 return;
             }
 
             if (course == null) {
-                Course newCourse = new Course(
-                        idField.getText(),
-                        nameField.getText(),
-                        codeField.getText(),
-                        Integer.parseInt(creditsField.getText())
-                );
-                DataStore.courses.add(newCourse);
+                // Dökümana göre constructor sırası: courseId, courseCode, courseName, credits
+                Course newCourse = new Course(courseId, code, name, credits);
+                DataStore.getCourses().add(newCourse);
             } else {
-                course.setCourseCode(codeField.getText());
-                course.setCourseName(nameField.getText());
-                course.setCredits(Integer.parseInt(creditsField.getText()));
+                // Edit modunda sadece değiştirilebilir alanlar güncellenir
+                course.setCourseCode(code);
+                course.setCourseName(name);
+                course.setCredits(credits);
             }
+
             close();
         });
 
@@ -71,6 +94,7 @@ public class CourseDialog extends Stage {
         grid.setPadding(new Insets(20));
         grid.setHgap(10);
         grid.setVgap(10);
+
         grid.addRow(0, new Label("Course ID:"), idField);
         grid.addRow(1, new Label("Course Code:"), codeField);
         grid.addRow(2, new Label("Course Name:"), nameField);
@@ -78,9 +102,12 @@ public class CourseDialog extends Stage {
         grid.addRow(4, save, cancel);
 
         setScene(new Scene(grid));
+        sizeToScene();
     }
 
-    private void alert(String msg) {
-        new Alert(Alert.AlertType.ERROR, msg, ButtonType.OK).showAndWait();
+    private void alert(String message) {
+        Alert alert = new Alert(Alert.AlertType.ERROR, message, ButtonType.OK);
+        alert.setHeaderText(null);
+        alert.showAndWait();
     }
 }

@@ -16,11 +16,13 @@ public class RoomDialog extends Stage {
         initModality(Modality.APPLICATION_MODAL);
 
         TextField idField = new TextField();
+        idField.setPromptText("e.g. 101");
         TextField nameField = new TextField();
         TextField capacityField = new TextField();
 
         if (room != null) {
-            idField.setText(room.getRoomId());
+            // Room artık int roomId kullanıyor
+            idField.setText(String.valueOf(room.getRoomId()));
             idField.setDisable(true); // ID değiştirilemez
             nameField.setText(room.getRoomName());
             capacityField.setText(String.valueOf(room.getCapacity()));
@@ -28,16 +30,27 @@ public class RoomDialog extends Stage {
 
         Button save = new Button("Save");
         save.setOnAction(e -> {
-            String id = idField.getText().trim();
+            String idStr = idField.getText().trim();
             String name = nameField.getText().trim();
             String capStr = capacityField.getText().trim();
 
-            if (id.isEmpty() || name.isEmpty() || capStr.isEmpty()) {
+            if (idStr.isEmpty() || name.isEmpty() || capStr.isEmpty()) {
                 alert("All fields are required!");
                 return;
             }
 
+            int roomId;
             int capacity;
+
+            // ID'yi int'e çevir
+            try {
+                roomId = Integer.parseInt(idStr);
+            } catch (NumberFormatException ex) {
+                alert("Room ID must be a valid number!");
+                return;
+            }
+
+            // Capacity'yi int'e çevir
             try {
                 capacity = Integer.parseInt(capStr);
                 if (capacity <= 0) {
@@ -49,16 +62,19 @@ public class RoomDialog extends Stage {
                 return;
             }
 
-            // Duplicate ID kontrolü (sadece yeni eklemede)
-            if (room == null && DataStore.rooms.stream().anyMatch(r -> r.getRoomId().equals(id))) {
+            // Yeni eklemede duplicate ID kontrolü
+            if (room == null && DataStore.getRooms().stream()
+                    .anyMatch(r -> r.getRoomId() == roomId)) {
                 alert("Room ID already exists!");
                 return;
             }
 
             if (room == null) {
-                Room newRoom = new Room(id, name, capacity);
-                DataStore.rooms.add(newRoom);
+                // Yeni oda ekle (int roomId ile)
+                Room newRoom = new Room(roomId, name, capacity);
+                DataStore.getRooms().add(newRoom);
             } else {
+                // Mevcut odayı güncelle
                 room.setRoomName(name);
                 room.setCapacity(capacity);
             }
@@ -79,6 +95,7 @@ public class RoomDialog extends Stage {
         grid.addRow(3, save, cancel);
 
         setScene(new Scene(grid));
+        sizeToScene();
     }
 
     private void alert(String message) {

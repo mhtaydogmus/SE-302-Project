@@ -1,14 +1,14 @@
 package com.examscheduler.constraint;
 
+import com.examscheduler.entity.ExamSession;
 import com.examscheduler.entity.Schedule;
 import com.examscheduler.entity.Student;
 
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 public class MaxExamsPerDayConstraint implements Constraint {
+
     private int maxExamsPerDay;
 
     public MaxExamsPerDayConstraint() {
@@ -16,33 +16,41 @@ public class MaxExamsPerDayConstraint implements Constraint {
     }
 
     public MaxExamsPerDayConstraint(int maxExamsPerDay) {
-        this.maxExamsPerDay = maxExamsPerDay;
+        this.maxExamsPerDay = Math.max(1, maxExamsPerDay); // en az 1 olsun
     }
 
     @Override
     public List<String> validate(Schedule schedule) {
         List<String> violations = new ArrayList<>();
 
-        if (schedule == null) {
+        if (schedule == null || schedule.getExamSessions() == null) {
             return violations;
         }
 
-        Set<Student> students = schedule.getAllStudents();
-        Set<LocalDate> dates = schedule.getAllDates();
+        // Helper: tüm öğrencileri topla (Schedule'da yoksa burada yap)
+        Set<Student> allStudents = new HashSet<>();
+        Set<LocalDate> allDates = new HashSet<>();
 
-        for (Student student : students) {
-            for (LocalDate date : dates) {
+        for (ExamSession session : schedule.getExamSessions()) {
+            allStudents.addAll(session.getAssignedStudents());
+            if (session.getTimeSlot() != null) {
+                allDates.add(session.getTimeSlot().getDate());
+            }
+        }
+
+        for (Student student : allStudents) {
+            for (LocalDate date : allDates) {
                 int count = student.getDailyExamCount(date);
 
                 if (count > maxExamsPerDay) {
                     String violation = String.format(
-                        "MAX EXAMS VIOLATION: Student %s (%s) has %d exams on %s " +
-                        "(maximum allowed: %d)",
-                        student.getStudentId(),
-                        student.getFullName(),
-                        count,
-                        date,
-                        maxExamsPerDay
+                            "MAX EXAMS VIOLATION: Student %d (%s) has %d exams on %s " +
+                                    "(maximum allowed: %d)",
+                            student.getStudentId(),
+                            student.getFullName(),
+                            count,
+                            date,
+                            maxExamsPerDay
                     );
                     violations.add(violation);
                 }
@@ -59,7 +67,7 @@ public class MaxExamsPerDayConstraint implements Constraint {
 
     @Override
     public String getDescription() {
-        return String.format("Limits students to a maximum of %d exams per day", maxExamsPerDay);
+        return "Limits students to maximum " + maxExamsPerDay + " exams per day";
     }
 
     public int getMaxExamsPerDay() {
@@ -67,15 +75,11 @@ public class MaxExamsPerDayConstraint implements Constraint {
     }
 
     public void setMaxExamsPerDay(int maxExamsPerDay) {
-        this.maxExamsPerDay = maxExamsPerDay;
+        this.maxExamsPerDay = Math.max(1, maxExamsPerDay);
     }
 
     @Override
     public String toString() {
-        return "MaxExamsPerDayConstraint{" +
-                "name='" + getName() + '\'' +
-                ", maxExamsPerDay=" + maxExamsPerDay +
-                ", description='" + getDescription() + '\'' +
-                '}';
+        return getName() + " (max = " + maxExamsPerDay + ")";
     }
 }

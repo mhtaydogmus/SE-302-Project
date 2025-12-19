@@ -8,6 +8,7 @@ import javafx.scene.control.*;
 import javafx.scene.layout.GridPane;
 import javafx.stage.Modality;
 import javafx.stage.Stage;
+
 import java.time.LocalDate;
 import java.time.LocalTime;
 
@@ -19,9 +20,9 @@ public class TimeSlotDialog extends Stage {
 
         DatePicker datePicker = new DatePicker();
         TextField startField = new TextField();
-        startField.setPromptText("HH:MM");
+        startField.setPromptText("HH:MM (e.g. 09:00)");
         TextField endField = new TextField();
-        endField.setPromptText("HH:MM");
+        endField.setPromptText("HH:MM (e.g. 11:00)");
 
         if (slot != null) {
             datePicker.setValue(slot.getDate());
@@ -40,7 +41,8 @@ public class TimeSlotDialog extends Stage {
                 return;
             }
 
-            LocalTime startTime, endTime;
+            LocalTime startTime;
+            LocalTime endTime;
             try {
                 startTime = LocalTime.parse(startStr);
                 endTime = LocalTime.parse(endStr);
@@ -49,22 +51,24 @@ public class TimeSlotDialog extends Stage {
                 return;
             }
 
-            if (endTime.isBefore(startTime) || endTime.equals(startTime)) {
+            if (!endTime.isAfter(startTime)) {
                 alert("End time must be after start time!");
                 return;
             }
 
             TimeSlot newSlot = new TimeSlot(date, startTime, endTime);
 
-            // Duplicate kontrolü (aynı tarih + aynı zaman aralığı)
-            boolean exists = DataStore.timeSlots.stream().anyMatch(ts -> ts.equals(newSlot));
+            // Duplicate kontrolü: Aynı tarih ve aynı zaman aralığı
+            boolean exists = DataStore.getTimeSlots().stream()
+                    .anyMatch(ts -> ts.equals(newSlot));
+
             if (slot == null && exists) {
                 alert("This time slot already exists!");
                 return;
             }
 
             if (slot == null) {
-                DataStore.timeSlots.add(newSlot);
+                DataStore.getTimeSlots().add(newSlot);
             } else {
                 slot.setDate(date);
                 slot.setStartTime(startTime);
@@ -81,12 +85,15 @@ public class TimeSlotDialog extends Stage {
         grid.setPadding(new Insets(20));
         grid.setHgap(10);
         grid.setVgap(10);
+
         grid.addRow(0, new Label("Date:"), datePicker);
         grid.addRow(1, new Label("Start Time:"), startField);
         grid.addRow(2, new Label("End Time:"), endField);
         grid.addRow(3, save, cancel);
 
         setScene(new Scene(grid));
+        sizeToScene();
+        setResizable(false);
     }
 
     private void alert(String message) {

@@ -3,28 +3,36 @@ package com.examscheduler.entity;
 import java.util.Objects;
 
 public class Room {
-    private String roomId;
+    private int roomId;         // ← Design Document'a uygun olarak int yapıldı
     private String roomName;
     private int capacity;
 
     public Room() {
+        // Default constructor (JavaFX tabloları ve dialoglar için gerekli)
     }
 
-    public Room(String roomId, String roomName, int capacity) {
+    public Room(int roomId, String roomName, int capacity) {
+        if (capacity < 0) {
+            throw new IllegalArgumentException("Capacity cannot be negative");
+        }
         this.roomId = roomId;
         this.roomName = roomName;
         this.capacity = capacity;
     }
 
+    /**
+     * Belirli sayıda öğrenci için kapasite yeterli mi?
+     */
     public boolean hasCapacity(int numberOfStudents) {
-        return this.capacity >= numberOfStudents;
+        return numberOfStudents >= 0 && this.capacity >= numberOfStudents;
     }
 
-    public String getRoomId() {
+    // Getter & Setter
+    public int getRoomId() {
         return roomId;
     }
 
-    public void setRoomId(String roomId) {
+    public void setRoomId(int roomId) {
         this.roomId = roomId;
     }
 
@@ -41,6 +49,9 @@ public class Room {
     }
 
     public void setCapacity(int capacity) {
+        if (capacity < 0) {
+            throw new IllegalArgumentException("Capacity cannot be negative");
+        }
         this.capacity = capacity;
     }
 
@@ -49,7 +60,7 @@ public class Room {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         Room room = (Room) o;
-        return Objects.equals(roomId, room.roomId);
+        return roomId == room.roomId;
     }
 
     @Override
@@ -57,12 +68,11 @@ public class Room {
         return Objects.hash(roomId);
     }
 
+    /**
+     * Görünüm için gerçekçi format: "Amfi A (101) - Capacity: 120"
+     */
     @Override
     public String toString() {
-        return "Room{" +
-                "roomId='" + roomId + '\'' +
-                ", roomName='" + roomName + '\'' +
-                ", capacity=" + capacity +
-                '}';
+        return roomName + " (" + roomId + ") - Capacity: " + capacity;
     }
 }

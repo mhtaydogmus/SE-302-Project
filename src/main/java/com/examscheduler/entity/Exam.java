@@ -5,9 +5,9 @@ import java.util.List;
 import java.util.Objects;
 
 public class Exam {
-    private String examId;
+    private int examId;                      // String → int yapıldı (belgeye uygun)
     private Course course;
-    private String examType;
+    private String name;
     private int durationMinutes;
     private List<ExamSession> examSessions;
 
@@ -15,36 +15,19 @@ public class Exam {
         this.examSessions = new ArrayList<>();
     }
 
-    public Exam(String examId, Course course, String examType, int durationMinutes) {
+    public Exam(int examId, Course course, String name, int durationMinutes) {
         this.examId = examId;
         this.course = course;
-        this.examType = examType;
+        this.name = name;
         this.durationMinutes = durationMinutes;
         this.examSessions = new ArrayList<>();
     }
 
-    public void addExamSession(ExamSession session) {
-        if (session != null && !examSessions.contains(session)) {
-            examSessions.add(session);
-        }
-    }
-
-    public void removeExamSession(ExamSession session) {
-        examSessions.remove(session);
-    }
-
-    public List<Student> getEnrolledStudents() {
-        if (course != null) {
-            return course.getEnrolledStudents();
-        }
-        return new ArrayList<>();
-    }
-
-    public String getExamId() {
+    public int getExamId() {
         return examId;
     }
 
-    public void setExamId(String examId) {
+    public void setExamId(int examId) {
         this.examId = examId;
     }
 
@@ -56,12 +39,12 @@ public class Exam {
         this.course = course;
     }
 
-    public String getExamType() {
-        return examType;
+    public String getName() {
+        return name;
     }
 
-    public void setExamType(String examType) {
-        this.examType = examType;
+    public void setName(String name) {
+        this.name = name;
     }
 
     public int getDurationMinutes() {
@@ -73,11 +56,26 @@ public class Exam {
     }
 
     public List<ExamSession> getExamSessions() {
-        return new ArrayList<>(examSessions);
+        return new ArrayList<>(examSessions);  // Defensive copy
     }
 
-    public void setExamSessions(List<ExamSession> examSessions) {
-        this.examSessions = examSessions != null ? new ArrayList<>(examSessions) : new ArrayList<>();
+    public void addExamSession(ExamSession session) {
+        if (session != null && !examSessions.contains(session)) {
+            examSessions.add(session);
+        }
+    }
+
+    public void removeExamSession(ExamSession session) {
+        if (session != null) {
+            examSessions.remove(session);
+        }
+    }
+
+    /**
+     * Önemli: Enrolled öğrencileri Course üzerinden alır
+     */
+    public List<Student> getEnrolledStudents() {
+        return course != null ? course.getEnrolledStudents() : new ArrayList<>();
     }
 
     @Override
@@ -85,7 +83,7 @@ public class Exam {
         if (this == o) return true;
         if (o == null || getClass() != o.getClass()) return false;
         Exam exam = (Exam) o;
-        return Objects.equals(examId, exam.examId);
+        return examId == exam.examId;
     }
 
     @Override
@@ -95,12 +93,10 @@ public class Exam {
 
     @Override
     public String toString() {
-        return "Exam{" +
-                "examId='" + examId + '\'' +
-                ", course=" + (course != null ? course.getCourseCode() : "null") +
-                ", examType='" + examType + '\'' +
-                ", durationMinutes=" + durationMinutes +
-                ", sessionCount=" + examSessions.size() +
-                '}';
+        String courseName = course != null ? course.getCourseName() : "No Course";
+        return (name != null ? name : "Unnamed Exam") +
+                " (ID: " + examId + ") - " +
+                courseName +
+                " - " + durationMinutes + " min";
     }
 }
