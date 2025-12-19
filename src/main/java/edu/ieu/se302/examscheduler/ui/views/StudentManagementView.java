@@ -4,7 +4,6 @@ import com.examscheduler.entity.Course;
 import com.examscheduler.entity.Enrollment;
 import com.examscheduler.entity.ExamSession;
 import com.examscheduler.entity.Student;
-import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -250,25 +249,35 @@ public class StudentManagementView {
     }
 
     private void setupUpcomingExamTable() {
-        TableColumn<ExamSession, LocalDate> dateCol = new TableColumn<>("Date");
-        dateCol.setCellValueFactory(cellData -> new SimpleObjectProperty<>(cellData.getValue().getTimeSlot().getDate()));
-        dateCol.setId("detailsExamDateColumn");
+        TableColumn<ExamSession, String> infoCol = new TableColumn<>("Upcoming Exam Sessions");
+        infoCol.setCellValueFactory(cellData -> new SimpleStringProperty(formatExamSession(cellData.getValue())));
+        infoCol.setId("detailsExamInfoColumn");
 
-        TableColumn<ExamSession, LocalTime> timeCol = new TableColumn<>("Time");
-        timeCol.setCellValueFactory(cellData -> new SimpleObjectProperty<>(cellData.getValue().getTimeSlot().getStartTime()));
-        timeCol.setId("detailsExamTimeColumn");
-
-        TableColumn<ExamSession, String> roomCol = new TableColumn<>("Room");
-        roomCol.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue().getRoom().getRoomName()));
-        roomCol.setId("detailsExamRoomColumn");
-
-        TableColumn<ExamSession, String> courseCol = new TableColumn<>("Course");
-        courseCol.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue().getExam().getCourse().getCourseName()));
-        courseCol.setId("detailsExamCourseColumn");
-
-        upcomingExamsTable.getColumns().addAll(dateCol, timeCol, roomCol, courseCol);
+        upcomingExamsTable.getColumns().setAll(infoCol);
         upcomingExamsTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
         upcomingExamsTable.setPlaceholder(new Label("Select a student to view their exam schedule."));
+    }
+
+    private String formatExamSession(ExamSession session) {
+        if (session == null) {
+            return "N/A";
+        }
+        String code = "N/A";
+        if (session.getExam() != null &&
+                session.getExam().getCourse() != null &&
+                session.getExam().getCourse().getCourseCode() != null &&
+                !session.getExam().getCourse().getCourseCode().isBlank()) {
+            code = session.getExam().getCourse().getCourseCode();
+        }
+
+        LocalDate date = session.getTimeSlot() != null ? session.getTimeSlot().getDate() : null;
+        LocalTime time = session.getTimeSlot() != null ? session.getTimeSlot().getStartTime() : null;
+        String room = session.getRoom() != null ? session.getRoom().getRoomName() : "N/A";
+
+        String datePart = date != null ? date.toString() : "N/A";
+        String timePart = time != null ? time.toString() : "N/A";
+
+        return String.format("%s - %s - %s - %s", code, datePart, timePart, room);
     }
 
     private void removeEnrollmentsForStudent(Student student) {

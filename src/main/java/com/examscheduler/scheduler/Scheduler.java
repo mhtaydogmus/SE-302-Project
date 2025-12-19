@@ -87,8 +87,8 @@ public class Scheduler {
         int sessionIndex = 0;
 
         while (!remainingStudents.isEmpty()) {
-            TimeSlot selectedTimeSlot = selectTimeSlot(remainingStudents, schedule);
-            Room selectedRoom = selectRoom(remainingStudents);
+            TimeSlot selectedTimeSlot = selectTimeSlot(remainingStudents, schedule, sessions);
+            Room selectedRoom = selectAvailableRoom(remainingStudents, selectedTimeSlot, sessions, schedule);
 
             if (selectedTimeSlot == null || selectedRoom == null) {
                 System.err.println("WARNING: Could not schedule all students for exam " + exam.getExamId());
@@ -149,7 +149,7 @@ public class Scheduler {
         return false;
     }
 
-    private TimeSlot selectTimeSlot(List<Student> students, Schedule schedule) {
+    private TimeSlot selectTimeSlot(List<Student> students, Schedule schedule, List<ExamSession> pendingSessions) {
         for (TimeSlot timeSlot : availableTimeSlots) {
             boolean suitableForMost = true;
 
@@ -161,12 +161,18 @@ public class Scheduler {
             }
 
             if (conflictCount < students.size() * 0.2) {
+                if (!hasFreeRoom(timeSlot, students.size(), pendingSessions, schedule)) {
+                    continue;
+                }
                 return new TimeSlot(timeSlot.getDate(), timeSlot.getStartTime(), timeSlot.getEndTime());
             }
         }
 
         if (!availableTimeSlots.isEmpty()) {
             TimeSlot ts = availableTimeSlots.get(0);
+            if (!hasFreeRoom(ts, students.size(), pendingSessions, schedule)) {
+                return null;
+            }
             return new TimeSlot(ts.getDate(), ts.getStartTime(), ts.getEndTime());
         }
 
@@ -174,28 +180,66 @@ public class Scheduler {
     }
 
 
-    private Room selectRoom(List<Student> students) {
-        int requiredCapacity = students.size();
+    private Room selectAvailableRoom(List<Student> students, TimeSlot timeSlot, List<ExamSession> pendingSessions, Schedule schedule) {
+        if (timeSlot == null) {
+            return null;
+        }
 
+        int requiredCapacity = students.size();
         Room bestRoom = null;
+
         for (Room room : availableRooms) {
+            if (!isRoomAvailable(room, timeSlot, pendingSessions, schedule)) {
+                continue;
+            }
+
             if (room.getCapacity() >= requiredCapacity) {
                 if (bestRoom == null || room.getCapacity() < bestRoom.getCapacity()) {
                     bestRoom = room;
                 }
-            }
-        }
-
-        if (bestRoom == null && !availableRooms.isEmpty()) {
-            bestRoom = availableRooms.get(0);
-            for (Room room : availableRooms) {
-                if (room.getCapacity() > bestRoom.getCapacity()) {
-                    bestRoom = room;
-                }
+            } else if (bestRoom == null) {
+                bestRoom = room; // fallback to any available room if none meet capacity
             }
         }
 
         return bestRoom;
+    }
+
+    private boolean hasFreeRoom(TimeSlot timeSlot, int requiredCapacity, List<ExamSession> pendingSessions, Schedule schedule) {
+        for (Room room : availableRooms) {
+            if (isRoomAvailable(room, timeSlot, pendingSessions, schedule)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean isRoomAvailable(Room room, TimeSlot timeSlot, List<ExamSession> pendingSessions, Schedule schedule) {
+        if (room == null || timeSlot == null) {
+            return false;
+        }
+
+        for (ExamSession session : pendingSessions) {
+            if (session.getRoom() != null &&
+                session.getRoom().equals(room) &&
+                session.getTimeSlot() != null &&
+                session.getTimeSlot().overlaps(timeSlot)) {
+                return false;
+            }
+        }
+
+        if (schedule != null) {
+            for (ExamSession session : schedule.getExamSessions()) {
+                if (session.getRoom() != null &&
+                    session.getRoom().equals(room) &&
+                    session.getTimeSlot() != null &&
+                    session.getTimeSlot().overlaps(timeSlot)) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
     }
 
 

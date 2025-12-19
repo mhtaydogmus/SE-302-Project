@@ -195,14 +195,17 @@ public final class CsvImportService {
         Map<String, Integer> headers = mapHeaders(rows, path);
 
         requireHeader(headers, "examid", path);
-        requireHeader(headers, "courseid", path);
         requireHeader(headers, "examtype", path);
         requireHeader(headers, "durationminutes", path);
+        if (!headers.containsKey("courseid") && !headers.containsKey("coursecode")) {
+            throw new IllegalArgumentException("Missing required header 'courseid' or 'coursecode' in " + path.getFileName());
+        }
 
         Map<String, Course> courseMap = new HashMap<>();
         if (courses != null) {
             for (Course course : courses) {
-                courseMap.put(course.getCourseId(), course);
+                addCourseLookupKey(courseMap, course.getCourseId(), course);
+                addCourseLookupKey(courseMap, course.getCourseCode(), course);
             }
         }
 
@@ -216,7 +219,10 @@ public final class CsvImportService {
             }
 
             String examId = getField(headers, row, "examid");
-            String courseId = getField(headers, row, "courseid");
+            String courseIdentifier = getField(headers, row, "courseid");
+            if (courseIdentifier.isBlank()) {
+                courseIdentifier = getField(headers, row, "coursecode");
+            }
             String examType = getField(headers, row, "examtype");
             int durationMinutes = parseInt(getField(headers, row, "durationminutes"), "duration minutes", i + 1, path);
 
@@ -227,9 +233,9 @@ public final class CsvImportService {
                 throw new IllegalArgumentException("Duplicate Exam ID '" + examId + "' at line " + (i + 1) + " in " + path.getFileName());
             }
 
-            Course course = courseMap.get(courseId);
+            Course course = courseMap.get(normalizeKey(courseIdentifier));
             if (course == null) {
-                throw new IllegalArgumentException("Unknown Course ID '" + courseId + "' at line " + (i + 1) + " in " + path.getFileName());
+                throw new IllegalArgumentException("Unknown Course ID or code '" + courseIdentifier + "' at line " + (i + 1) + " in " + path.getFileName());
             }
 
             exams.add(new Exam(examId, course, examType, durationMinutes));
@@ -484,6 +490,20 @@ public final class CsvImportService {
             nonEmptyRows++;
         }
         return nonEmptyRows > 0;
+    }
+
+    private static void addCourseLookupKey(Map<String, Course> courseMap, String key, Course course) {
+        String normalized = normalizeKey(key);
+        if (!normalized.isEmpty() && course != null) {
+            courseMap.putIfAbsent(normalized, course);
+        }
+    }
+
+    private static String normalizeKey(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.trim().toLowerCase();
     }
 
     private static void parseSingleColumnStudentIds(List<List<String>> rows,

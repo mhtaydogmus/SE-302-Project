@@ -1,6 +1,7 @@
 package edu.ieu.se302.examscheduler.ui.controllers;
 
 import com.examscheduler.entity.Course;
+import com.examscheduler.entity.Exam;
 import com.examscheduler.entity.ExamSession;
 import com.examscheduler.entity.Student;
 import javafx.collections.FXCollections;
@@ -12,11 +13,16 @@ import javafx.scene.control.ListView;
 import javafx.scene.control.TableView;
 import javafx.scene.layout.VBox;
 
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 public class ScheduleController {
     private final ObservableList<Student> students;
+    private final ObservableList<Exam> exams;
+    private final ObservableList<ExamSession> scheduleSessions;
     private final ListView<Student> studentList;
     private final VBox detailsPanel;
     private final Label detailsNameLabel;
@@ -29,6 +35,8 @@ public class ScheduleController {
     private final Button closeDetailsButton;
 
     public ScheduleController(ObservableList<Student> students,
+                              ObservableList<Exam> exams,
+                              ObservableList<ExamSession> scheduleSessions,
                               ListView<Student> studentList,
                               VBox detailsPanel,
                               Label detailsNameLabel,
@@ -40,6 +48,8 @@ public class ScheduleController {
                               Button deleteStudentButton,
                               Button closeDetailsButton) {
         this.students = students;
+        this.exams = exams;
+        this.scheduleSessions = scheduleSessions;
         this.studentList = studentList;
         this.detailsPanel = detailsPanel;
         this.detailsNameLabel = detailsNameLabel;
@@ -96,7 +106,7 @@ public class ScheduleController {
                 .map(this::formatCourseLabel)
                 .collect(Collectors.toList());
         detailsCourseList.setItems(FXCollections.observableArrayList(courseNames));
-        detailsExamTable.setItems(FXCollections.observableArrayList(student.getAssignedSessions()));
+        detailsExamTable.setItems(FXCollections.observableArrayList(findSessionsForStudent(student)));
 
         showDetails();
     }
@@ -127,6 +137,36 @@ public class ScheduleController {
     private void hideDetails() {
         detailsPanel.setVisible(false);
         detailsPanel.setManaged(false);
+    }
+
+    private List<ExamSession> findSessionsForStudent(Student student) {
+        if (student == null || scheduleSessions == null) {
+            return FXCollections.observableArrayList();
+        }
+        Set<Course> enrolledCourses = new HashSet<>(student.getEnrolledCourses());
+        if (enrolledCourses.isEmpty()) {
+            return FXCollections.observableArrayList();
+        }
+
+        Set<Exam> enrolledExams = new HashSet<>();
+        if (exams != null) {
+            for (Exam exam : exams) {
+                if (exam != null && exam.getCourse() != null && enrolledCourses.contains(exam.getCourse())) {
+                    enrolledExams.add(exam);
+                }
+            }
+        }
+
+        List<ExamSession> sessions = new ArrayList<>();
+        for (ExamSession session : scheduleSessions) {
+            if (session == null || session.getExam() == null) {
+                continue;
+            }
+            if (enrolledExams.contains(session.getExam())) {
+                sessions.add(session);
+            }
+        }
+        return sessions;
     }
 
     private String formatCourseLabel(Course course) {
