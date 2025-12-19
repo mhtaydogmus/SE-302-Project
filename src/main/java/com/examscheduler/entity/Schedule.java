@@ -15,12 +15,14 @@ public class Schedule {
     private LocalDate endDate;
     private List<ExamSession> examSessions;
     private List<Constraint> constraints;
+    private List<String> schedulingNotes;
     private boolean isValid;
     private List<String> validationMessages;
 
     public Schedule() {
         this.examSessions = new ArrayList<>();
         this.constraints = new ArrayList<>();
+        this.schedulingNotes = new ArrayList<>();
         this.validationMessages = new ArrayList<>();
         this.isValid = false;
     }
@@ -32,8 +34,19 @@ public class Schedule {
         this.endDate = endDate;
         this.examSessions = new ArrayList<>();
         this.constraints = new ArrayList<>();
+        this.schedulingNotes = new ArrayList<>();
         this.validationMessages = new ArrayList<>();
         this.isValid = false;
+    }
+
+    public List<String> getSchedulingNotes() {
+        return new ArrayList<>(schedulingNotes);
+    }
+
+    public void addSchedulingNote(String note) {
+        if (note != null && !note.isBlank()) {
+            this.schedulingNotes.add(note);
+        }
     }
 
     public List<String> validate() {

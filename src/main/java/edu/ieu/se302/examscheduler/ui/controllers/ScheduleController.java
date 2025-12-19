@@ -162,7 +162,8 @@ public class ScheduleController {
             if (session == null || session.getExam() == null) {
                 continue;
             }
-            if (enrolledExams.contains(session.getExam())) {
+            Course sessionCourse = session.getExam().getCourse();
+            if (enrolledExams.contains(session.getExam()) || (sessionCourse != null && enrolledCourses.contains(sessionCourse))) {
                 sessions.add(session);
             }
         }

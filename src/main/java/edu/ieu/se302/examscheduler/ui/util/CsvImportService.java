@@ -526,7 +526,7 @@ public final class CsvImportService {
             if (!seenIds.add(id)) {
                 throw new IllegalArgumentException("Duplicate Student ID '" + id + "' at line " + (i + 1) + " in " + path.getFileName());
             }
-            students.add(new Student(id, "N/A", "N/A", "N/A", "Not specified"));
+            students.add(new Student(id, null, null, null, null));
         }
     }
 

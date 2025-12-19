@@ -9,7 +9,11 @@ import com.examscheduler.entity.*;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 public class Scheduler {
@@ -39,7 +43,7 @@ public class Scheduler {
         this.customConstraints = customConstraints != null ? new ArrayList<>(customConstraints) : new ArrayList<>();
     }
 
-    public Schedule generateSchedule(List<Course> courses, List<Exam> exams) {
+    public Schedule generateSchedule(List<Course> courses, List<Exam> ignoredExams) {
         Schedule schedule = new Schedule(
             UUID.randomUUID().toString(),
             "Generated Exam Schedule",
@@ -55,23 +59,41 @@ public class Scheduler {
             schedule.addConstraint(constraint);
         }
 
-        for (Exam exam : exams) {
-            List<Student> enrolledStudents = exam.getEnrolledStudents();
+        List<Exam> examsToSchedule = new ArrayList<>();
+        if (courses != null) {
+            for (Course course : courses) {
+                if (course == null) continue;
+                String examId = course.getCourseCode() != null && !course.getCourseCode().isBlank()
+                        ? course.getCourseCode()
+                        : course.getCourseId();
+                int duration = course.getExamDurationMinutes() > 0 ? course.getExamDurationMinutes() : 120;
+                examsToSchedule.add(new Exam(examId, course, "Course Exam", duration));
+            }
+        }
 
+        // Prioritization: Sort exams by number of students in descending order
+        examsToSchedule.sort(Comparator.comparingInt((Exam exam) -> exam.getEnrolledStudents().size()).reversed());
+
+        for (Exam exam : examsToSchedule) {
+            List<Student> enrolledStudents = exam.getEnrolledStudents();
             if (enrolledStudents.isEmpty()) {
+                schedule.addSchedulingNote("Skipped exam " + exam.getExamId() + ": No enrolled students.");
                 continue;
             }
 
-            List<ExamSession> sessions = createExamSessions(exam, enrolledStudents, schedule);
+            List<ExamSession> sessions = findAndCreateExamSessions(exam, enrolledStudents, schedule);
 
-            for (ExamSession session : sessions) {
-                exam.addExamSession(session);
-                schedule.addExamSession(session);
+            if (sessions.isEmpty()) {
+                // Detailed logging is now handled inside findAndCreateExamSessions
+            } else {
+                for (ExamSession session : sessions) {
+                    exam.addExamSession(session);
+                    schedule.addExamSession(session);
+                }
             }
         }
 
         List<String> violations = schedule.validate();
-
         if (!violations.isEmpty()) {
             attemptToResolveViolations(schedule, violations);
         }
@@ -79,53 +101,101 @@ public class Scheduler {
         return schedule;
     }
 
+    private List<ExamSession> findAndCreateExamSessions(Exam exam, List<Student> students, Schedule schedule) {
+        Map<String, Integer> failureReasons = new HashMap<>();
 
-    private List<ExamSession> createExamSessions(Exam exam, List<Student> students, Schedule schedule) {
-        List<ExamSession> sessions = new ArrayList<>();
-        List<Student> remainingStudents = new ArrayList<>(students);
-
-        int sessionIndex = 0;
-
-        while (!remainingStudents.isEmpty()) {
-            TimeSlot selectedTimeSlot = selectTimeSlot(remainingStudents, schedule, sessions);
-            Room selectedRoom = selectAvailableRoom(remainingStudents, selectedTimeSlot, sessions, schedule);
-
-            if (selectedTimeSlot == null || selectedRoom == null) {
-                System.err.println("WARNING: Could not schedule all students for exam " + exam.getExamId());
-                break;
+        for (TimeSlot timeSlot : availableTimeSlots) {
+            // Step 1: Check for student conflicts using a temporary session, as requested.
+            boolean studentConflict = false;
+            ExamSession proposedSession = new ExamSession(null, exam, timeSlot, null);
+            for (Student student : students) {
+                if (student.hasExamOverlap(proposedSession)) {
+                    studentConflict = true;
+                    break;
+                }
+            }
+            if (studentConflict) {
+                failureReasons.merge("STUDENT_CONFLICT", 1, Integer::sum);
+                continue;
             }
 
-            String sessionId = exam.getExamId() + "-S" + (++sessionIndex);
-            ExamSession session = new ExamSession(sessionId, exam, selectedTimeSlot, selectedRoom);
+            // Step 1.5: Check for max exams per day constraint
+            boolean maxExamsConflict = false;
+            for (Student student : students) {
+                if (student.getDailyExamCount(timeSlot.getDate()) >= this.maxExamsPerDay) {
+                    maxExamsConflict = true;
+                    break;
+                }
+            }
+            if (maxExamsConflict) {
+                failureReasons.merge("MAX_EXAMS_PER_DAY", 1, Integer::sum);
+                continue; // Try the next time slot
+            }
 
-            List<Student> studentsToAssign = new ArrayList<>();
-            for (Student student : new ArrayList<>(remainingStudents)) {
-                if (!student.hasExamOverlap(session) &&
-                    student.getDailyExamCount(session.getTimeSlot().getDate()) < maxExamsPerDay &&
-                    !hasConsecutiveExam(student, session)) {
-                    studentsToAssign.add(student);
-                    if (studentsToAssign.size() >= selectedRoom.getCapacity()) {
-                        break;
-                    }
+            // Step 2: Find available rooms for this time slot.
+            List<Room> availableRoomsForSlot = new ArrayList<>();
+            for (Room room : this.availableRooms) {
+                if (isRoomAvailable(room, timeSlot, new ArrayList<>(), schedule)) {
+                    availableRoomsForSlot.add(room);
                 }
             }
 
-            if (studentsToAssign.isEmpty()) {
-                System.err.println("WARNING: No students could be assigned to a new session for exam " +
-                                   exam.getExamId() + " (likely due to conflicts)");
-                break;
+            // Step 3: Try to find a single room that fits.
+            List<Room> roomsThatFit = new ArrayList<>();
+            for (Room room : availableRoomsForSlot) {
+                if (room.getCapacity() >= students.size()) {
+                    roomsThatFit.add(room);
+                }
             }
 
-            for (Student student : studentsToAssign) {
-                session.assignStudent(student);
-                student.assignExamSession(session);
-                remainingStudents.remove(student);
+            if (!roomsThatFit.isEmpty()) {
+                // Shuffle the list of suitable rooms to avoid 'first-fit' bias.
+                Collections.shuffle(roomsThatFit);
+                Room selectedRoom = roomsThatFit.get(0); // Pick the first from the shuffled list.
+
+                String sessionId = exam.getExamId() + "-S1";
+                ExamSession session = new ExamSession(sessionId, exam, timeSlot, selectedRoom);
+                for (Student student : students) {
+                    session.assignStudent(student);
+                    student.assignExamSession(session);
+                }
+                return List.of(session);
             }
 
-            sessions.add(session);
+            // Step 4: If no single room is big enough, try to fit into multiple rooms.
+            // Sort rooms largest to smallest for efficient packing.
+            availableRoomsForSlot.sort(Comparator.comparingInt(Room::getCapacity).reversed());
+            long totalCapacity = availableRoomsForSlot.stream().mapToLong(Room::getCapacity).sum();
+            if (totalCapacity >= students.size()) {
+                List<ExamSession> sessions = new ArrayList<>();
+                List<Student> remainingStudents = new ArrayList<>(students);
+                int sessionIndex = 0;
+
+                for (Room room : availableRoomsForSlot) {
+                    if (remainingStudents.isEmpty()) break;
+
+                    String sessionId = exam.getExamId() + "-S" + (++sessionIndex);
+                    ExamSession session = new ExamSession(sessionId, exam, timeSlot, room);
+
+                    List<Student> studentsToAssign = new ArrayList<>(remainingStudents.subList(0, Math.min(remainingStudents.size(), room.getCapacity())));
+                    for (Student student : studentsToAssign) {
+                        session.assignStudent(student);
+                        student.assignExamSession(session);
+                    }
+
+                    remainingStudents.removeAll(studentsToAssign);
+                    sessions.add(session);
+                }
+                return sessions;
+            } else {
+                failureReasons.merge("INSUFFICIENT_CAPACITY", 1, Integer::sum);
+            }
         }
-
-        return sessions;
+        
+        // If loop finishes, scheduling failed for this exam. Log detailed reason.
+        String reason = "Could not find a suitable time/room for exam " + exam.getExamId() + ". Failures: " + failureReasons;
+        schedule.addSchedulingNote(reason);
+        return new ArrayList<>();
     }
 
     private boolean hasConsecutiveExam(Student student, ExamSession newSession) {
@@ -149,70 +219,6 @@ public class Scheduler {
         return false;
     }
 
-    private TimeSlot selectTimeSlot(List<Student> students, Schedule schedule, List<ExamSession> pendingSessions) {
-        for (TimeSlot timeSlot : availableTimeSlots) {
-            boolean suitableForMost = true;
-
-            int conflictCount = 0;
-            for (Student student : students) {
-                if (student.getDailyExamCount(timeSlot.getDate()) >= maxExamsPerDay) {
-                    conflictCount++;
-                }
-            }
-
-            if (conflictCount < students.size() * 0.2) {
-                if (!hasFreeRoom(timeSlot, students.size(), pendingSessions, schedule)) {
-                    continue;
-                }
-                return new TimeSlot(timeSlot.getDate(), timeSlot.getStartTime(), timeSlot.getEndTime());
-            }
-        }
-
-        if (!availableTimeSlots.isEmpty()) {
-            TimeSlot ts = availableTimeSlots.get(0);
-            if (!hasFreeRoom(ts, students.size(), pendingSessions, schedule)) {
-                return null;
-            }
-            return new TimeSlot(ts.getDate(), ts.getStartTime(), ts.getEndTime());
-        }
-
-        return null;
-    }
-
-
-    private Room selectAvailableRoom(List<Student> students, TimeSlot timeSlot, List<ExamSession> pendingSessions, Schedule schedule) {
-        if (timeSlot == null) {
-            return null;
-        }
-
-        int requiredCapacity = students.size();
-        Room bestRoom = null;
-
-        for (Room room : availableRooms) {
-            if (!isRoomAvailable(room, timeSlot, pendingSessions, schedule)) {
-                continue;
-            }
-
-            if (room.getCapacity() >= requiredCapacity) {
-                if (bestRoom == null || room.getCapacity() < bestRoom.getCapacity()) {
-                    bestRoom = room;
-                }
-            } else if (bestRoom == null) {
-                bestRoom = room; // fallback to any available room if none meet capacity
-            }
-        }
-
-        return bestRoom;
-    }
-
-    private boolean hasFreeRoom(TimeSlot timeSlot, int requiredCapacity, List<ExamSession> pendingSessions, Schedule schedule) {
-        for (Room room : availableRooms) {
-            if (isRoomAvailable(room, timeSlot, pendingSessions, schedule)) {
-                return true;
-            }
-        }
-        return false;
-    }
 
     private boolean isRoomAvailable(Room room, TimeSlot timeSlot, List<ExamSession> pendingSessions, Schedule schedule) {
         if (room == null || timeSlot == null) {

@@ -92,7 +92,16 @@ public class Student {
     }
 
     public String getFullName() {
-        return firstName + " " + lastName;
+        boolean firstNameInvalid = (firstName == null || firstName.isBlank());
+        boolean lastNameInvalid = (lastName == null || lastName.isBlank());
+        if (firstNameInvalid && lastNameInvalid) {
+            return "Student [" + studentId + "]";
+        }
+        
+        String fName = firstNameInvalid ? "" : firstName.trim();
+        String lName = lastNameInvalid ? "" : lastName.trim();
+
+        return (fName + " " + lName).trim();
     }
 
     public String getStudentId() {
