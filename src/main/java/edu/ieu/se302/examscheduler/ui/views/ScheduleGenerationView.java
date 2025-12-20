@@ -574,9 +574,9 @@ public class ScheduleGenerationView {
 
     /**
      * Clears all previous schedule state to prevent conflicts when regenerating.
-     * This is critical because students maintain bidirectional references to ExamSessions.
-     * Without this cleanup, old ExamSession objects remain in students' assignedSessions lists,
-     * causing false conflicts during scheduling (overlap detection, daily exam count, etc.)
+     * This is critical because students and exams maintain bidirectional references to ExamSessions.
+     * Without this cleanup, old ExamSession objects remain in students' and exams' lists,
+     * causing false conflicts during scheduling and duplicate sessions in the UI.
      */
     private void clearPreviousScheduleState() {
         // Clear all exam session assignments from all students
@@ -585,6 +585,15 @@ public class ScheduleGenerationView {
                 // Clear the student's assigned sessions list
                 // This prevents old ExamSession references from interfering with new schedule generation
                 student.setAssignedSessions(new ArrayList<>());
+            }
+        }
+
+        // Clear all exam sessions from all exams
+        for (Exam exam : exams) {
+            if (exam != null) {
+                // Clear the exam's session list
+                // This prevents duplicate sessions from accumulating across regenerations
+                exam.setExamSessions(new ArrayList<>());
             }
         }
 

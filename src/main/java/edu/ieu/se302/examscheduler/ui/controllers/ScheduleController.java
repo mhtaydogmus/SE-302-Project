@@ -140,34 +140,12 @@ public class ScheduleController {
     }
 
     private List<ExamSession> findSessionsForStudent(Student student) {
-        if (student == null || scheduleSessions == null) {
+        if (student == null) {
             return FXCollections.observableArrayList();
         }
-        Set<Course> enrolledCourses = new HashSet<>(student.getEnrolledCourses());
-        if (enrolledCourses.isEmpty()) {
-            return FXCollections.observableArrayList();
-        }
-
-        Set<Exam> enrolledExams = new HashSet<>();
-        if (exams != null) {
-            for (Exam exam : exams) {
-                if (exam != null && exam.getCourse() != null && enrolledCourses.contains(exam.getCourse())) {
-                    enrolledExams.add(exam);
-                }
-            }
-        }
-
-        List<ExamSession> sessions = new ArrayList<>();
-        for (ExamSession session : scheduleSessions) {
-            if (session == null || session.getExam() == null) {
-                continue;
-            }
-            Course sessionCourse = session.getExam().getCourse();
-            if (enrolledExams.contains(session.getExam()) || (sessionCourse != null && enrolledCourses.contains(sessionCourse))) {
-                sessions.add(session);
-            }
-        }
-        return sessions;
+        // Return the student's actually assigned sessions
+        // This prevents showing duplicate sessions when exams are split across multiple rooms
+        return new ArrayList<>(student.getAssignedSessions());
     }
 
     private String formatCourseLabel(Course course) {

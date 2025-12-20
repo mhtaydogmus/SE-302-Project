@@ -3,6 +3,7 @@ package edu.ieu.se302.examscheduler.ui.views;
 import com.examscheduler.entity.Course;
 import com.examscheduler.entity.Enrollment;
 import com.examscheduler.entity.ExamSession;
+import com.examscheduler.entity.Room;
 import javafx.beans.property.SimpleObjectProperty;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
@@ -123,7 +124,20 @@ public class CourseManagementView {
         timeCol.setCellValueFactory(cellData -> new SimpleObjectProperty<>(cellData.getValue().getTimeSlot().getStartTime()));
 
         TableColumn<ExamSession, String> roomCol = new TableColumn<>("Room");
-        roomCol.setCellValueFactory(cellData -> new SimpleStringProperty(cellData.getValue().getRoom().getRoomName()));
+        roomCol.setCellValueFactory(cellData -> {
+            ExamSession session = cellData.getValue();
+            Room room = session != null ? session.getRoom() : null;
+            if (room == null) {
+                return new SimpleStringProperty("N/A");
+            }
+            // Prefer roomName, fallback to roomId if name is empty
+            String roomName = room.getRoomName();
+            if (roomName != null && !roomName.isBlank()) {
+                return new SimpleStringProperty(roomName);
+            }
+            String roomId = room.getRoomId();
+            return new SimpleStringProperty(roomId != null && !roomId.isBlank() ? roomId : "N/A");
+        });
 
         courseScheduleTable.getColumns().addAll(dateCol, timeCol, roomCol);
         courseScheduleTable.setColumnResizePolicy(TableView.CONSTRAINED_RESIZE_POLICY);
