@@ -544,7 +544,15 @@ public class MainWindow {
         Alert alert = new Alert(Alert.AlertType.INFORMATION);
         alert.setTitle(I18n.get("dialog.help.title"));
         alert.setHeaderText(I18n.get("dialog.help.header"));
-        alert.setContentText(I18n.get("dialog.help.content"));
+
+        // Use TextArea for scrollable content
+        TextArea textArea = new TextArea(I18n.get("dialog.help.content"));
+        textArea.setEditable(false);
+        textArea.setWrapText(true);
+        textArea.setPrefRowCount(25);
+        textArea.setPrefColumnCount(60);
+
+        alert.getDialogPane().setContent(textArea);
         alert.showAndWait();
     }
 }

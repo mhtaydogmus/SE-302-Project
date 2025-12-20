@@ -253,15 +253,14 @@ public class CourseManagementView {
     
     private boolean validateCourse(String id, String name, String code) {
         String errorMessage = "";
-        if (id == null || id.trim().isEmpty()) {
-            errorMessage += "Course ID cannot be empty.\n";
+        // Require at least courseId OR courseCode (matches CSV import behavior)
+        boolean hasId = id != null && !id.trim().isEmpty();
+        boolean hasCode = code != null && !code.trim().isEmpty();
+
+        if (!hasId && !hasCode) {
+            errorMessage += "Either Course ID or Course Code must be provided.\n";
         }
-        if (name == null || name.trim().isEmpty()) {
-            errorMessage += "Course name cannot be empty.\n";
-        }
-        if (code == null || code.trim().isEmpty()) {
-            errorMessage += "Course code cannot be empty.\n";
-        }
+        // Course name is optional (matches CSV import behavior)
 
         if (errorMessage.isEmpty()) {
             return true;

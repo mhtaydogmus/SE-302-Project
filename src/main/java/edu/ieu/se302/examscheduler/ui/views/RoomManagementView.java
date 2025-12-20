@@ -228,9 +228,7 @@ public class RoomManagementView {
         if (id == null || id.trim().isEmpty()) {
             errorMessage += "Room ID cannot be empty.\n";
         }
-        if (name == null || name.trim().isEmpty()) {
-            errorMessage += "Room name cannot be empty.\n";
-        }
+        // Room name is optional (matches CSV import behavior)
 
         if (errorMessage.isEmpty()) {
             return true;

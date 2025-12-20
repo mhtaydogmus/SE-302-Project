@@ -209,10 +209,9 @@ public class ExamManagementView {
         if (course == null) {
             errorMessage += "Course must be selected.\n";
         }
-        if (type == null || type.trim().isEmpty()) {
-            errorMessage += "Exam type cannot be empty.\n";
-        }
-        if (duration == null || duration <= 0) {
+        // Exam type is optional (matches CSV import behavior - defaults to empty)
+        // Duration is optional, but if provided, must be positive (matches CSV import behavior - defaults to 120)
+        if (duration != null && duration <= 0) {
             errorMessage += "Duration must be greater than 0.\n";
         }
 

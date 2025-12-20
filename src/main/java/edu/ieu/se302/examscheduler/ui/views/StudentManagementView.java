@@ -424,17 +424,11 @@ public class StudentManagementView {
         if (id == null || id.trim().isEmpty()) {
             errorMessage += "Student ID cannot be empty.\n";
         }
-        if (firstName == null || firstName.trim().isEmpty()) {
-            errorMessage += "First name cannot be empty.\n";
-        }
-        if (lastName == null || lastName.trim().isEmpty()) {
-            errorMessage += "Last name cannot be empty.\n";
-        }
-        if (email == null || !email.matches("[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}")) {
-            errorMessage += "Invalid email address.\n";
-        }
-        if (gender == null) {
-            errorMessage += "Gender must be selected.\n";
+        // firstName, lastName, gender are optional (matches CSV import behavior)
+
+        // Email is optional, but if provided, validate format
+        if (email != null && !email.trim().isEmpty() && !email.matches("[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}")) {
+            errorMessage += "Invalid email address format.\n";
         }
 
         if (errorMessage.isEmpty()) {
