@@ -373,23 +373,9 @@ public final class CsvImportService {
     }
 
     private static List<List<String>> readCsv(Path path) throws IOException {
-        // Try UTF-8 first, then fallback to Windows-1254 (common for Turkish Excel files)
-        List<String> lines = null;
-        try {
-            lines = Files.readAllLines(path, StandardCharsets.UTF_8);
-        } catch (Exception e) {
-            // Fallback to Windows-1254 if UTF-8 fails
-            lines = Files.readAllLines(path, java.nio.charset.Charset.forName("Windows-1254"));
-        }
-
+        List<String> lines = Files.readAllLines(path, StandardCharsets.UTF_8);
         if (lines.isEmpty()) {
             throw new IllegalArgumentException("CSV file is empty: " + path.getFileName());
-        }
-
-        // Remove UTF-8 BOM (Byte Order Mark) if present
-        // Excel adds this invisible character (\uFEFF) at the start
-        if (!lines.get(0).isEmpty() && lines.get(0).charAt(0) == '\uFEFF') {
-            lines.set(0, lines.get(0).substring(1));
         }
 
         List<List<String>> rows = new ArrayList<>();
