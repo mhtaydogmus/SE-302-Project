@@ -308,7 +308,7 @@ public final class CsvImportService {
             }
 
             String firstToken = cleanToken(nonEmptyCells.get(0));
-            boolean headerLike = firstToken.toLowerCase().contains("course");
+            boolean headerLike = firstToken.toLowerCase(java.util.Locale.ENGLISH).contains("course");
             boolean onlyFirstCell = nonEmptyCells.size() == 1;
             boolean firstIsCourse = courseMap.containsKey(firstToken);
 
@@ -393,7 +393,8 @@ public final class CsvImportService {
 
         Map<String, Integer> headerIndex = new HashMap<>();
         for (int i = 0; i < headerRow.size(); i++) {
-            String key = headerRow.get(i).trim().toLowerCase();
+            // Use English locale to prevent Turkish "I" → "ı" conversion
+            String key = headerRow.get(i).trim().toLowerCase(java.util.Locale.ENGLISH);
             if (!key.isEmpty()) {
                 headerIndex.put(key, i);
             }
@@ -543,7 +544,8 @@ public final class CsvImportService {
         if (value == null) {
             return "";
         }
-        return value.trim().toLowerCase();
+        // Use English locale to prevent Turkish "I" → "ı" conversion
+        return value.trim().toLowerCase(java.util.Locale.ENGLISH);
     }
 
     private static void parseSingleColumnStudentIds(List<List<String>> rows,
@@ -559,7 +561,7 @@ public final class CsvImportService {
             if (value.isEmpty()) {
                 continue;
             }
-            if (i == 0 && value.toLowerCase().contains("student")) {
+            if (i == 0 && value.toLowerCase(java.util.Locale.ENGLISH).contains("student")) {
                 continue;
             }
             String id = value;
@@ -583,7 +585,7 @@ public final class CsvImportService {
             if (value.isEmpty()) {
                 continue;
             }
-            if (i == 0 && value.toLowerCase().contains("course")) {
+            if (i == 0 && value.toLowerCase(java.util.Locale.ENGLISH).contains("course")) {
                 continue;
             }
             String id = value;
@@ -607,7 +609,7 @@ public final class CsvImportService {
             if (value.isEmpty()) {
                 continue;
             }
-            String lower = value.toLowerCase();
+            String lower = value.toLowerCase(java.util.Locale.ENGLISH);
             if (i == 0 && (lower.contains("classroom") || lower.contains("room"))) {
                 continue;
             }
