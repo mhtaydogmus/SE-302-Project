@@ -59,7 +59,14 @@ public class StudentManagementView {
                 if (empty || item == null) {
                     setText(null);
                 } else {
-                    setText(item.getStudentId() + " - " + item.getFirstName() + " " + item.getLastName() + " (" + item.getEmail() + ")");
+                    String firstName = item.getFirstName() != null && !item.getFirstName().isBlank() ? item.getFirstName() : "";
+                    String lastName = item.getLastName() != null && !item.getLastName().isBlank() ? item.getLastName() : "";
+                    String email = item.getEmail() != null && !item.getEmail().isBlank() ? item.getEmail() : "no email";
+                    String fullName = (firstName + " " + lastName).trim();
+                    if (fullName.isEmpty()) {
+                        fullName = "No Name";
+                    }
+                    setText(item.getStudentId() + " - " + fullName + " (" + email + ")");
                 }
             }
         });

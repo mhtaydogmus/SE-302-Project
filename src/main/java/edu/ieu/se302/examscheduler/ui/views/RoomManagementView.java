@@ -48,7 +48,12 @@ public class RoomManagementView {
                         if (empty || item == null) {
                             setText(null);
                         } else {
-                            setText(item.getRoomName() + " (Capacity: " + item.getCapacity() + ")");
+                            // Prefer roomName, fallback to roomId
+                            String name = item.getRoomName();
+                            if (name == null || name.isBlank()) {
+                                name = item.getRoomId();
+                            }
+                            setText(name + " (Capacity: " + item.getCapacity() + ")");
                         }
                     }
                 };

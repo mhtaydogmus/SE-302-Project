@@ -38,7 +38,10 @@ public class TimeSlotManagementView {
                         if (empty || item == null) {
                             setText(null);
                         } else {
-                            setText(item.getDate() + " " + item.getStartTime() + " - " + item.getEndTime());
+                            String date = item.getDate() != null ? item.getDate().toString() : "No Date";
+                            String startTime = item.getStartTime() != null ? item.getStartTime().toString() : "??:??";
+                            String endTime = item.getEndTime() != null ? item.getEndTime().toString() : "??:??";
+                            setText(date + " " + startTime + " - " + endTime);
                         }
                     }
                 };

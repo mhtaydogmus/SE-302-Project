@@ -42,8 +42,13 @@ public class ExamManagementView {
                         if (empty || item == null) {
                             setText(null);
                         } else {
-                            String courseLabel = item.getCourse() != null ? item.getCourse().getCourseCode() : "N/A";
-                            setText(item.getExamId() + " - " + courseLabel + " (" + item.getExamType() + ")");
+                            String courseLabel = "N/A";
+                            if (item.getCourse() != null) {
+                                String code = item.getCourse().getCourseCode();
+                                courseLabel = (code != null && !code.isBlank()) ? code : item.getCourse().getCourseId();
+                            }
+                            String examType = item.getExamType() != null && !item.getExamType().isBlank() ? item.getExamType() : "Exam";
+                            setText(item.getExamId() + " - " + courseLabel + " - " + examType + " (" + item.getDurationMinutes() + " min)");
                         }
                     }
                 };

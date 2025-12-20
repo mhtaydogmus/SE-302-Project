@@ -44,9 +44,16 @@ public class EnrollmentManagementView {
                 if (empty || item == null) {
                     setText(null);
                 } else {
-                    String studentLabel = item.getStudent() != null ? item.getStudent().getStudentId() : "N/A";
-                    String courseLabel = item.getCourse() != null ? item.getCourse().getCourseCode() : "N/A";
-                    setText(studentLabel + " -> " + courseLabel);
+                    String studentLabel = "N/A";
+                    if (item.getStudent() != null) {
+                        studentLabel = item.getStudent().getStudentId();
+                    }
+                    String courseLabel = "N/A";
+                    if (item.getCourse() != null) {
+                        String code = item.getCourse().getCourseCode();
+                        courseLabel = (code != null && !code.isBlank()) ? code : item.getCourse().getCourseId();
+                    }
+                    setText(studentLabel + " enrolled in " + courseLabel);
                 }
             }
         });
@@ -124,7 +131,15 @@ public class EnrollmentManagementView {
                 if (empty || item == null) {
                     setText(null);
                 } else {
-                    setText(item.getCourseCode() + " - " + item.getCourseName());
+                    String code = item.getCourseCode();
+                    if (code == null || code.isBlank()) {
+                        code = item.getCourseId();
+                    }
+                    String name = item.getCourseName();
+                    if (name == null || name.isBlank()) {
+                        name = "No Name";
+                    }
+                    setText(code + " - " + name);
                 }
             }
         });
@@ -135,7 +150,15 @@ public class EnrollmentManagementView {
                 if (empty || item == null) {
                     setText(null);
                 } else {
-                    setText(item.getCourseCode() + " - " + item.getCourseName());
+                    String code = item.getCourseCode();
+                    if (code == null || code.isBlank()) {
+                        code = item.getCourseId();
+                    }
+                    String name = item.getCourseName();
+                    if (name == null || name.isBlank()) {
+                        name = "No Name";
+                    }
+                    setText(code + " - " + name);
                 }
             }
         });

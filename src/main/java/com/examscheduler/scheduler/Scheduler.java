@@ -53,6 +53,7 @@ public class Scheduler {
             }
         }
         System.out.println("Available time slots: " + (availableTimeSlots != null ? availableTimeSlots.size() : 0));
+        System.out.println("Max exams per day limit: " + maxExamsPerDay);
         System.out.println("======================");
 
         Schedule schedule = new Schedule(
@@ -99,7 +100,7 @@ public class Scheduler {
                 continue;
             }
 
-            List<ExamSession> sessions = findAndCreateExamSessions(exam, enrolledStudents, schedule);
+            List<ExamSession> sessions = findAndCreateExamSessions(exam, enrolledStudents, schedule, maxExamsPerDay);
 
             if (sessions.isEmpty()) {
                 // Detailed logging is now handled inside findAndCreateExamSessions
@@ -119,8 +120,8 @@ public class Scheduler {
         return schedule;
     }
 
-    private List<ExamSession> findAndCreateExamSessions(Exam exam, List<Student> students, Schedule schedule) {
-        System.out.println("\nDEBUG: Scheduling exam " + exam.getExamId() + " for " + students.size() + " students");
+    private List<ExamSession> findAndCreateExamSessions(Exam exam, List<Student> students, Schedule schedule, int currentMaxPerDay) {
+        System.out.println("\nDEBUG: Scheduling exam " + exam.getExamId() + " for " + students.size() + " students (current limit: " + currentMaxPerDay + " exams/day)");
         Map<String, Integer> failureReasons = new HashMap<>();
 
         for (TimeSlot timeSlot : availableTimeSlots) {
@@ -138,10 +139,10 @@ public class Scheduler {
                 continue;
             }
 
-            // Step 1.5: Check for max exams per day constraint
+            // Step 1.5: Check for max exams per day constraint (using current pass limit)
             boolean maxExamsConflict = false;
             for (Student student : students) {
-                if (student.getDailyExamCount(timeSlot.getDate()) >= this.maxExamsPerDay) {
+                if (student.getDailyExamCount(timeSlot.getDate()) >= currentMaxPerDay) {
                     maxExamsConflict = true;
                     break;
                 }

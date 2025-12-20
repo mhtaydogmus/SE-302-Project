@@ -466,16 +466,101 @@ public class ScheduleGenerationView {
             alert.showAndWait();
             return null;
         } else if (!notes.isEmpty()) {
+            // Calculate scheduling recommendations
+            int failedExams = notes.size();
+            int totalExams = exams.size();
+            int scheduledExams = totalExams - failedExams;
+            int currentTimeSlots = timeSlots.size();
+            int currentRooms = rooms.size();
+
+            // Analyze failure types from notes
+            int capacityFailures = 0;
+            int conflictFailures = 0;
+            for (String note : notes) {
+                if (note.contains("INSUFFICIENT_CAPACITY")) {
+                    capacityFailures++;
+                } else if (note.contains("STUDENT_CONFLICT") || note.contains("MAX_EXAMS_PER_DAY")) {
+                    conflictFailures++;
+                }
+            }
+
+            // Calculate room capacity statistics
+            int totalRoomCapacity = rooms.stream().mapToInt(Room::getCapacity).sum();
+            int maxRoomCapacity = rooms.stream().mapToInt(Room::getCapacity).max().orElse(0);
+            int largestExamSize = exams.stream()
+                .mapToInt(e -> e.getCourse() != null ? e.getCourse().getEnrollments().size() : 0)
+                .max()
+                .orElse(0);
+
             Alert alert = new Alert(Alert.AlertType.WARNING);
             alert.setTitle("Incomplete Schedule Generated");
-            alert.setHeaderText("Some courses could not be scheduled. See notes for details.");
-            
-            TextArea textArea = new TextArea(String.join("\n- ", notes));
+            alert.setHeaderText(String.format("Only %d of %d exams were scheduled successfully.", scheduledExams, totalExams));
+
+            StringBuilder message = new StringBuilder();
+            message.append(String.format("Failed to schedule %d exams.\n\n", failedExams));
+
+            // Diagnose primary issue
+            message.append("DIAGNOSIS:\n\n");
+            message.append(String.format("• Time Slots: %d available\n", currentTimeSlots));
+            message.append(String.format("• Rooms: %d available (total capacity: %d)\n", currentRooms, totalRoomCapacity));
+            message.append(String.format("• Largest room capacity: %d\n", maxRoomCapacity));
+            message.append(String.format("• Largest exam size: %d students\n", largestExamSize));
+            message.append(String.format("• Max exams/day: %d\n\n", maxExamsPerDay));
+
+            message.append("FAILURE ANALYSIS:\n");
+            if (conflictFailures > 0) {
+                message.append(String.format("• %d exams failed due to TIME/STUDENT conflicts\n", conflictFailures));
+            }
+            if (capacityFailures > 0) {
+                message.append(String.format("• %d exams failed due to INSUFFICIENT ROOM CAPACITY\n", capacityFailures));
+            }
+            message.append("\n");
+
+            // Provide general recommendations
+            message.append("RECOMMENDATIONS:\n\n");
+
+            if (conflictFailures > capacityFailures && conflictFailures > 0) {
+                // Primary issue: not enough time slots
+                message.append("⚠ PRIMARY ISSUE: Not enough time slots or scheduling constraints\n\n");
+                message.append("POSSIBLE SOLUTIONS:\n");
+                message.append("• Generate more time slots using 'Bulk Generate Slots'\n");
+                message.append("• Increase 'Max Exams/Day' setting to allow more concurrent exams\n");
+                if (capacityFailures > 0) {
+                    message.append("• Add more rooms or increase room capacities\n");
+                }
+            } else if (capacityFailures > 0) {
+                // Primary issue: insufficient room capacity
+                message.append("⚠ PRIMARY ISSUE: Insufficient room capacity\n\n");
+                if (largestExamSize > maxRoomCapacity) {
+                    message.append(String.format("• Your largest exam (%d students) exceeds largest room (%d capacity)\n",
+                                                largestExamSize, maxRoomCapacity));
+                }
+                message.append("\nPOSSIBLE SOLUTIONS:\n");
+                message.append("• Import or add rooms with higher capacity\n");
+                message.append("• Add more rooms to the system\n");
+                if (conflictFailures > 0) {
+                    message.append("• Generate more time slots to spread exams across more days\n");
+                }
+            }
+
+            message.append(String.format("\n%d exam(s) could not be scheduled.\n", failedExams));
+            message.append("Please review the recommendations above and adjust your settings accordingly.");
+
+            TextArea textArea = new TextArea(message.toString());
             textArea.setEditable(false);
             textArea.setWrapText(true);
+            textArea.setPrefRowCount(20);
 
             alert.getDialogPane().setContent(textArea);
-            alert.showAndWait();
+
+            // Add button to directly open slot generator
+            ButtonType generateSlotsButton = new ButtonType("Generate More Slots", ButtonBar.ButtonData.OK_DONE);
+            alert.getButtonTypes().setAll(generateSlotsButton, ButtonType.CANCEL);
+
+            Optional<ButtonType> result = alert.showAndWait();
+            if (result.isPresent() && result.get() == generateSlotsButton) {
+                showBulkGenerateDialog();
+            }
         } else {
             Alert alert = new Alert(Alert.AlertType.INFORMATION);
             alert.setTitle("Schedule Generated");

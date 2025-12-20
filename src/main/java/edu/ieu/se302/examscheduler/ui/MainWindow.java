@@ -26,6 +26,7 @@ import javafx.stage.FileChooser;
 import java.io.File;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Main window layout (menu + panels + view container) as required in Meeting Report 4, Task 3.
@@ -115,6 +116,10 @@ public class MainWindow {
         reimportAttendanceItem = new MenuItem(I18n.get("menu.file.reimport.attendance"));
         reimportAttendanceItem.setDisable(true);
         reimportAttendanceItem.setOnAction(e -> reimportAttendanceOnly());
+
+        MenuItem clearAllItem = new MenuItem("Clear All Data");
+        clearAllItem.setOnAction(e -> clearAllData());
+
         MenuItem exit = new MenuItem(I18n.get("menu.file.exit"));
         exit.setOnAction(e -> root.getScene().getWindow().hide());
         file.getItems().addAll(
@@ -124,12 +129,16 @@ public class MainWindow {
                 importRoomsItem,
                 importExamsItem,
                 importAttendanceItem,
+                new SeparatorMenuItem(),
                 reimportItem,
                 reimportStudentsItem,
                 reimportCoursesItem,
                 reimportRoomsItem,
                 reimportExamsItem,
                 reimportAttendanceItem,
+                new SeparatorMenuItem(),
+                clearAllItem,
+                new SeparatorMenuItem(),
                 exit
         );
 
@@ -451,6 +460,47 @@ public class MainWindow {
         lastTimeSlotsPath = timeSlotsPath;
         lastExamsPath = examsPath;
         reimportItem.setDisable(false);
+    }
+
+    private void clearAllData() {
+        Alert confirmAlert = new Alert(Alert.AlertType.CONFIRMATION);
+        confirmAlert.setTitle("Clear All Data");
+        confirmAlert.setHeaderText("Are you sure you want to clear all data?");
+        confirmAlert.setContentText("This will remove all students, courses, rooms, exams, time slots, enrollments, and schedules.\n\nThis action cannot be undone.");
+
+        Optional<ButtonType> result = confirmAlert.showAndWait();
+        if (result.isPresent() && result.get() == ButtonType.OK) {
+            // Clear all data
+            studentView.getStudents().clear();
+            courseView.getCourses().clear();
+            roomView.getRooms().clear();
+            timeSlotView.getTimeSlots().clear();
+            exams.clear();
+            enrollments.clear();
+            scheduleSessions.clear();
+
+            // Reset import paths
+            lastStudentsPath = null;
+            lastCoursesPath = null;
+            lastRoomsPath = null;
+            lastTimeSlotsPath = null;
+            lastExamsPath = null;
+            lastAttendancePath = null;
+
+            // Disable reimport buttons
+            reimportItem.setDisable(true);
+            reimportStudentsItem.setDisable(true);
+            reimportCoursesItem.setDisable(true);
+            reimportRoomsItem.setDisable(true);
+            reimportExamsItem.setDisable(true);
+            reimportAttendanceItem.setDisable(true);
+
+            Alert successAlert = new Alert(Alert.AlertType.INFORMATION);
+            successAlert.setTitle("Data Cleared");
+            successAlert.setHeaderText(null);
+            successAlert.setContentText("All data has been cleared successfully. You can now import new data.");
+            successAlert.showAndWait();
+        }
     }
 
     private void showError(String title, String message) {

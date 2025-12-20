@@ -51,7 +51,9 @@ public class CourseManagementView {
                         if (empty || item == null) {
                             setText(null);
                         } else {
-                            setText(item.getCourseCode() + " - " + item.getCourseName());
+                            String courseCode = item.getCourseCode() != null && !item.getCourseCode().isBlank() ? item.getCourseCode() : item.getCourseId();
+                            String courseName = item.getCourseName() != null && !item.getCourseName().isBlank() ? item.getCourseName() : "No Name";
+                            setText(courseCode + " - " + courseName + " (" + item.getCredits() + " credits)");
                         }
                     }
                 };
