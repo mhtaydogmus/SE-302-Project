@@ -19,7 +19,9 @@ public class TimeSlot {
     }
 
     public boolean overlaps(TimeSlot other) {
-        if (other == null) {
+        if (other == null || this.date == null || other.date == null ||
+            this.startTime == null || this.endTime == null ||
+            other.startTime == null || other.endTime == null) {
             return false;
         }
 

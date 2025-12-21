@@ -109,6 +109,18 @@ public class ExamSession {
         this.maxCapacity = maxCapacity;
     }
 
+    public java.time.LocalTime getActualEndTime() {
+        if (timeSlot == null || exam == null) {
+            return null;
+        }
+        java.time.LocalTime startTime = timeSlot.getStartTime();
+        if (startTime == null) {
+            return null;
+        }
+        int durationMinutes = exam.getDurationMinutes();
+        return startTime.plusMinutes(durationMinutes);
+    }
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;

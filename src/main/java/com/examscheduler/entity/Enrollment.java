@@ -6,40 +6,40 @@ import java.util.Objects;
 public class Enrollment {
     private String enrollmentId;
     private Student student;
-    private Course course;
-    private LocalDateTime enrollmentDate;
-    private String status;
-
-    public Enrollment() {
-    }
-
-    public Enrollment(String enrollmentId, Student student, Course course) {
-        this.enrollmentId = enrollmentId;
-        this.student = student;
-        this.course = course;
-        this.enrollmentDate = LocalDateTime.now();
-        this.status = "ACTIVE";
-    }
-
-    public Enrollment(String enrollmentId, Student student, Course course, LocalDateTime enrollmentDate, String status) {
-        this.enrollmentId = enrollmentId;
-        this.student = student;
-        this.course = course;
-        this.enrollmentDate = enrollmentDate;
-        this.status = status;
-    }
-
-    public boolean isActive() {
-        return "ACTIVE".equals(status);
-    }
-
-    public void drop() {
-        this.status = "DROPPED";
-    }
-
-    public void complete() {
-        this.status = "COMPLETED";
-    }
+        private Course course;
+        private LocalDateTime enrollmentDate;
+        private EnrollmentStatus status;
+    
+        public Enrollment() {
+        }
+    
+        public Enrollment(String enrollmentId, Student student, Course course) {
+            this.enrollmentId = enrollmentId;
+            this.student = student;
+            this.course = course;
+            this.enrollmentDate = LocalDateTime.now();
+            this.status = EnrollmentStatus.ACTIVE;
+        }
+    
+        public Enrollment(String enrollmentId, Student student, Course course, LocalDateTime enrollmentDate, EnrollmentStatus status) {
+            this.enrollmentId = enrollmentId;
+            this.student = student;
+            this.course = course;
+            this.enrollmentDate = enrollmentDate;
+            this.status = status;
+        }
+    
+        public boolean isActive() {
+            return status == EnrollmentStatus.ACTIVE;
+        }
+    
+        public void drop() {
+            this.status = EnrollmentStatus.WITHDRAWN;
+        }
+    
+        public void complete() {
+            this.status = EnrollmentStatus.COMPLETED;
+        }
 
     public String getEnrollmentId() {
         return enrollmentId;
@@ -73,11 +73,11 @@ public class Enrollment {
         this.enrollmentDate = enrollmentDate;
     }
 
-    public String getStatus() {
+    public EnrollmentStatus getStatus() {
         return status;
     }
 
-    public void setStatus(String status) {
+    public void setStatus(EnrollmentStatus status) {
         this.status = status;
     }
 
@@ -101,7 +101,7 @@ public class Enrollment {
                 ", student=" + (student != null ? student.getStudentId() : "null") +
                 ", course=" + (course != null ? course.getCourseCode() : "null") +
                 ", enrollmentDate=" + enrollmentDate +
-                ", status='" + status + '\'' +
+                ", status=" + status +
                 '}';
     }
 }
